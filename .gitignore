@@ -1,7 +1,4 @@
 .env
 Logs/
-Output/
 data/
-*.pyc
-__pycache__/
-Dockerfile    # you’ll keep the root Dockerfile, but ignore extra ones
+Output/
