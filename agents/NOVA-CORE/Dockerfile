@@ -1,14 +1,14 @@
 FROM python:3.11-slim
 
-# Work from repo root
-WORKDIR /app
+# 1. Make NOVA-CORE the working dir
+WORKDIR /app/agents/NOVA-CORE
 
-# Copy everything into the image
-COPY . .
+# 2. Copy ONLY the NOVA-CORE agent
+COPY agents/NOVA-CORE ./
 
-# Install exactly what NOVA-CORE needs
+# 3. Install dependencies
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir redis openai
 
-# Run your NOVA-CORE loop
-CMD ["python", "agents/NOVA-CORE/nova.py"]
+# 4. Run nova.py directly
+CMD ["python", "nova.py"]
