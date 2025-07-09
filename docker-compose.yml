@@ -1,0 +1,74 @@
+services:
+  ceo-vision:
+    image: python:3.11-slim
+    container_name: novaos_ceo_vision
+    working_dir: /app/agents/CEO-VISION
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    command: >
+      sh -c "
+        pip install --upgrade pip --disable-pip-version-check &&
+        pip install --no-cache-dir openai redis &&
+        python ceo.py"
+    depends_on:
+      - redis
+
+  cto-auto:
+    image: python:3.11-slim
+    container_name: novaos_cto_auto
+    working_dir: /app/agents/CTO-AUTO
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    command: >
+      sh -c "
+        pip install --upgrade pip --disable-pip-version-check &&
+        pip install --no-cache-dir openai redis &&
+        python cto.py"
+    depends_on:
+      - redis
+
+  nova-core:
+    image: python:3.11-slim
+    container_name: novaos_nova_core
+    working_dir: /app/agents/NOVA-CORE
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    command: >
+      sh -c "
+        pip install --upgrade pip --disable-pip-version-check &&
+        pip install --no-cache-dir openai redis &&
+        python nova.py"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis
+    container_name: novaos_redis
+    ports:
+      - "6379:6379"
+
+  baserow:
+    image: baserow/baserow:latest
+    container_name: novaos_baserow
+    ports:
+      - "80:80"
+    env_file:
+      - .env
+
+  n8n:
+    image: n8nio/n8n
+    container_name: novaos_n8n
+    ports:
+      - "5678:5678"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/home/node/.n8n
+
+
