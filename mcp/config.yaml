@@ -1,0 +1,8 @@
+backend:
+  type: redis
+  host: ${REDIS_HOST}
+  port: 6379
+
+channels:
+  tasks:
+    key: novaos:tasks

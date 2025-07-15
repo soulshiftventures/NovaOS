@@ -1,0 +1,15 @@
+services:
+  novaos-langgraph:
+    container_name: novaos_langgraph
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./langgraph:/app
+    env_file:
+      - .env
+    command: >
+      sh -c "
+        pip install --upgrade pip --disable-pip-version-check &&
+        pip install --no-cache-dir langchain-openai langgraph langchain-community dropbox &&
+        python main.py"
+    restart: unless-stopped
