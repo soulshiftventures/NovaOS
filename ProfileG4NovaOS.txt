@@ -1,0 +1,16 @@
+# Version: 1.0
+# Grok 4 User Profile for NovaOS
+# Read Instructions: Parse key:value. t: = traits, i: = interests, p: = prefs, e: = emotions, g: = goals, gt: = Grok tweaks, h: = highlights. %X = set X%, %+X = up X%, %-X = down X%. /MM/DD = date. # = comment, ignore line. Apply to baseline, prioritize p:, decay i: 10%/month, e: 5%/month, h: 15%/month.
+# Update Instructions: Process delta: Add: key:value = append new line. Change: key:old>new = replace old with new. Delete: key = remove line. Merge into this file.
+t:problem_solver
+t:visionary_leader
+i:web3_trends%90/07/17
+i:automation_strategies%85/07/17
+p:agent_automation_focus
+p:clear_numbered_instructions
+e:determined%95/07/17
+g:achieve_25k_per_stream
+g:cloud_migration_complete
+gt:reasoning_depth%+30
+gt:verbosity%-20
+h:launched_first_stream%90/07/17
