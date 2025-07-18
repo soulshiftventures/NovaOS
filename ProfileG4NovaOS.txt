@@ -4,13 +4,14 @@
 # Update Instructions: Process delta: Add: key:value = append new line. Change: key:old>new = replace old with new. Delete: key = remove line. Merge into this file.
 t:problem_solver
 t:visionary_leader
-i:web3_trends%90/07/17
-i:automation_strategies%85/07/17
+i:web3_trends%90/07/18
+i:automation_strategies%85/07/18
 p:agent_automation_focus
 p:clear_numbered_instructions
-e:determined%95/07/17
+p:no_manual_edits
+e:determined%95/07/18
 g:achieve_25k_per_stream
 g:cloud_migration_complete
 gt:reasoning_depth%+30
 gt:verbosity%-20
-h:launched_first_stream%90/07/17
+h:launched_first_stream%90/07/18
