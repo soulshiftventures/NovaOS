@@ -5,11 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-REDIS_HOST = 'red-d1u794c9c44c73cmjbf0'
-REDIS_PORT = 6379
-REDIS_DB = 0
-
-r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
+r = redis.Redis(host='red-d1u794c9c44c73cmjbf0', port=6379, db=0)
 pubsub = r.pubsub()
 pubsub.subscribe('novaos:commands')
 
