@@ -1,36 +1,27 @@
-from langchain.chat_models import ChatOpenAI
-from langgraph.graph import StateGraph, END
+import os
+import json
+import redis
+from dotenv import load_dotenv
 
-AI_SYSTEMS_ENGINEER_PROMPT = """You are the AI Systems Engineer for NovaOS.
-Your job is to initialize the system, check core agents, and route tasks accordingly.
-Begin by confirming that the Automation Architect should take over.
-"""
+load_dotenv()
 
-AUTOMATION_ARCHITECT_PROMPT = """You are the Automation Architect for NovaOS.
-You design n8n workflows, Dropbox sync, and external automations.
-Confirm you are online and ready for configuration.
-"""
+REDIS_HOST = 'red-d1u794c9c44c73cmjbf0'
+REDIS_PORT = 6379
+REDIS_DB = 0
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
+pubsub = r.pubsub()
+pubsub.subscribe('novaos:commands')
 
-def ai_systems_engineer(state):
-    print("🟢 AI Systems Engineer is booting...")
-    response = llm.invoke(AI_SYSTEMS_ENGINEER_PROMPT)
-    print("🧠 AI Systems Engineer:", response.content)
-    return state
-
-def automation_architect(state):
-    print("🔧 Automation Architect is now active...")
-    response = llm.invoke(AUTOMATION_ARCHITECT_PROMPT)
-    print("🧠 Automation Architect:", response.content)
-    return state
-
-graph = StateGraph()
-graph.add_node("ai_systems_engineer", ai_systems_engineer)
-graph.add_node("automation_architect", automation_architect)
-graph.set_entry_point("ai_systems_engineer")
-graph.add_edge("ai_systems_engineer", "automation_architect")
-graph.set_finish_point("automation_architect")
-
-app = graph.compile()
-app.invoke({})
+for message in pubsub.listen():
+    if message['type'] == 'message':
+        try:
+            cmd = json.loads(message['data'].decode('utf-8'))
+            if cmd.get('agent') == 'GrokWatcherAgent':
+                payload = cmd['payload']
+                if payload.get('action') == 'watch_grok':
+                    # Example action for GrokWatcherAgent - replace with actual logic if known
+                    result = "Watched Grok updates: New features detected."
+                    r.publish('novaos:logs', json.dumps({'event': 'Grok Watched', 'details': result}))
+        except Exception as e:
+            r.publish('novaos:logs', json.dumps({'event': 'GrokWatcherAgent Error', 'details': str(e)}))
