@@ -12,7 +12,6 @@ LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
 REDIS_URL = os.getenv('REDIS_URL')
 
 r = redis.from_url(REDIS_URL)
-pubsub = r.pubsub()
 
 try:
     r.ping()
@@ -23,6 +22,7 @@ except Exception as e:
 print("All Agents Started")
 
 def stream_builder_thread():
+    pubsub = r.pubsub()
     try:
         pubsub.subscribe('novaos:commands')
         print("StreamBuilder Subscribed")
@@ -53,6 +53,7 @@ def stream_builder_thread():
         print("StreamBuilder Subscribe Error: " + str(e))
 
 def time_sentinel_thread():
+    print("TimeSentinel Started")
     while True:
         try:
             optimization = "Monitored streams: Optimized for $25k/month total revenue."
@@ -63,6 +64,7 @@ def time_sentinel_thread():
         time.sleep(60)
 
 def dashboard_agent_thread():
+    pubsub = r.pubsub()
     try:
         pubsub.subscribe('novaos:commands')
         print("DashboardAgent Subscribed")
