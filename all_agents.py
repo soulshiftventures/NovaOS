@@ -22,67 +22,67 @@ except Exception as e:
 print("All Agents Started")
 
 def handle_stream_builder_message(message):
-    if message['type'] == 'message':
-        try:
-            cmd = json.loads(message['data'].decode('utf-8'))
-            print("Received command in StreamBuilder: " + str(cmd))
-            if cmd.get('agent') == 'StreamBuilder':
-                payload = cmd['payload']
-                r_stream = redis.from_url(REDIS_URL)  # Fresh client for publish
-                if payload.get('action') == 'test_lemon_squeezy':
-                    headers = {'Authorization': f'Bearer {LEMON_SQUEEZY_API_KEY}'}
-                    response = requests.get('https://api.lemonsqueezy.com/v1/stores', headers=headers)
-                    if response.status_code == 200:
-                        r_stream.publish('novaos:logs', json.dumps({'event': 'Lemon Squeezy Connected', 'details': 'API connection successful'}))
-                        print("Lemon Squeezy Connected: Success")
-                    else:
-                        r_stream.publish('novaos:logs', json.dumps({'event': 'Lemon Squeezy Error', 'details': f'API failed: {response.status_code} {response.text}'}))
-                        print("Lemon Squeezy Error: " + response.text)
-                elif payload.get('action') == 'launch_streams':
-                    count = payload.get('count', 1)
-                    r_stream.publish('novaos:logs', json.dumps({'event': 'Streams Launched', 'details': f"Launched {count} streams with UI/UX."}))
-                    print("Streams Launched")
-        except Exception as e:
-            r_stream = redis.from_url(REDIS_URL)
-            r_stream.publish('novaos:logs', json.dumps({'event': 'StreamBuilder Error', 'details': str(e)}))
-            print("StreamBuilder Error: " + str(e))
+    try:
+        cmd = json.loads(message['data'].decode('utf-8'))
+        print("Received command in StreamBuilder: " + str(cmd))
+        if cmd.get('agent') == 'StreamBuilder':
+            payload = cmd['payload']
+            r_stream = redis.from_url(REDIS_URL)  # Fresh client for publish
+            if payload.get('action') == 'test_lemon_squeezy':
+                headers = {'Authorization': f'Bearer {LEMON_SQUEEZY_API_KEY}'}
+                response = requests.get('https://api.lemonsqueezy.com/v1/stores', headers=headers)
+                if response.status_code == 200:
+                    r_stream.publish('novaos:logs', json.dumps({'event': 'Lemon Squeezy Connected', 'details': 'API connection successful'}))
+                    print("Lemon Squeezy Connected: Success")
+                else:
+                    r_stream.publish('novaos:logs', json.dumps({'event': 'Lemon Squeezy Error', 'details': f'API failed: {response.status_code} {response.text}'}))
+                    print("Lemon Squeezy Error: " + response.text)
+            elif payload.get('action') == 'launch_streams':
+                count = payload.get('count', 1)
+                r_stream.publish('novaos:logs', json.dumps({'event': 'Streams Launched', 'details': f"Launched {count} streams with UI/UX."}))
+                print("Streams Launched")
+    except Exception as e:
+        r_stream = redis.from_url(REDIS_URL)
+        r_stream.publish('novaos:logs', json.dumps({'event': 'StreamBuilder Error', 'details': str(e)}))
+        print("StreamBuilder Error: " + str(e))
 
 def stream_builder_thread():
     print("StreamBuilder Thread Started")
     r_stream = redis.from_url(REDIS_URL)
-    pubsub = r_stream.pubsub()
+    pubsub = r_stream.pubsub(ignore_subscribe_messages=True)
     try:
-        pubsub.subscribe('novaos:commands')
+        pubsub.subscribe(**{'novaos:commands': handle_stream_builder_message})
         print("StreamBuilder Subscribed")
-        pubsub.run_in_thread(sleep_time=0.001, daemon=True, handler=handle_stream_builder_message)
+        pubsub.run_in_thread(sleep_time=0.001, daemon=True)
+        print("StreamBuilder Listener Started")
     except Exception as e:
         print("StreamBuilder Subscribe Error: " + str(e))
 
 def handle_dashboard_message(message):
-    if message['type'] == 'message':
-        try:
-            cmd = json.loads(message['data'].decode('utf-8'))
-            print("Received command in DashboardAgent: " + str(cmd))
-            if cmd.get('agent') == 'DashboardAgent':
-                payload = cmd['payload']
-                r_dash = redis.from_url(REDIS_URL)  # Fresh client for publish
-                if payload.get('action') == 'build_dashboard':
-                    dashboard = "Built dashboard with UI/UX for streams: status, revenue tracking."
-                    r_dash.publish('novaos:logs', json.dumps({'event': 'Dashboard built', 'details': dashboard}))
-                    print("Dashboard Built")
-        except Exception as e:
-            r_dash = redis.from_url(REDIS_URL)
-            r_dash.publish('novaos:logs', json.dumps({'event': 'DashboardAgent error', 'details': str(e)}))
-            print("DashboardAgent Error: " + str(e))
+    try:
+        cmd = json.loads(message['data'].decode('utf-8'))
+        print("Received command in DashboardAgent: " + str(cmd))
+        if cmd.get('agent') == 'DashboardAgent':
+            payload = cmd['payload']
+            r_dash = redis.from_url(REDIS_URL)  # Fresh client for publish
+            if payload.get('action') == 'build_dashboard':
+                dashboard = "Built dashboard with UI/UX for streams: status, revenue tracking."
+                r_dash.publish('novaos:logs', json.dumps({'event': 'Dashboard built', 'details': dashboard}))
+                print("Dashboard Built")
+    except Exception as e:
+        r_dash = redis.from_url(REDIS_URL)
+        r_dash.publish('novaos:logs', json.dumps({'event': 'DashboardAgent error', 'details': str(e)}))
+        print("DashboardAgent Error: " + str(e))
 
 def dashboard_agent_thread():
     print("DashboardAgent Thread Started")
     r_dash = redis.from_url(REDIS_URL)
-    pubsub = r_dash.pubsub()
+    pubsub = r_dash.pubsub(ignore_subscribe_messages=True)
     try:
-        pubsub.subscribe('novaos:commands')
+        pubsub.subscribe(**{'novaos:commands': handle_dashboard_message})
         print("DashboardAgent Subscribed")
-        pubsub.run_in_thread(sleep_time=0.001, daemon=True, handler=handle_dashboard_message)
+        pubsub.run_in_thread(sleep_time=0.001, daemon=True)
+        print("DashboardAgent Listener Started")
     except Exception as e:
         print("DashboardAgent Subscribe Error: " + str(e))
 
