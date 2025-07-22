@@ -11,10 +11,18 @@ load_dotenv()
 REDIS_HOST = 'red-d1u794c9c44c73cmjbf0'
 REDIS_PORT = 6379
 REDIS_DB = 0
+REDIS_USERNAME = 'red-d1u794c9c44c73cmjbf0'
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
 
-r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, username=REDIS_USERNAME, password=REDIS_PASSWORD)
 pubsub = r.pubsub()
+
+try:
+    r.ping()
+    print("Redis Connected Successfully")
+except Exception as e:
+    print("Redis Connection Error: " + str(e))
 
 print("All Agents Started")
 
