@@ -26,6 +26,7 @@ def handle_command(cmd, r_handle):
         payload = cmd['payload']
         if agent == 'StreamBuilder':
             if payload.get('action') == 'test_lemon_squeezy':
+                print(f"Using Lemon Squeezy key: {LEMON_SQUEEZY_API_KEY[:4]}...{LEMON_SQUEEZY_API_KEY[-4:]} if set", flush=True)
                 headers = {'Authorization': f'Bearer {LEMON_SQUEEZY_API_KEY}'}
                 response = requests.get('https://api.lemonsqueezy.com/v1/stores', headers=headers)
                 if response.status_code == 200:
