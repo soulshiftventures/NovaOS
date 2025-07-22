@@ -11,10 +11,10 @@ load_dotenv()
 LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
 REDIS_URL = os.getenv('REDIS_URL')
 
-r = redis.from_url(REDIS_URL)
-
+# Startup ping with temp client
+temp_r = redis.from_url(REDIS_URL)
 try:
-    r.ping()
+    temp_r.ping()
     print("Redis Connected Successfully")
 except Exception as e:
     print("Redis Connection Error: " + str(e))
@@ -22,7 +22,9 @@ except Exception as e:
 print("All Agents Started")
 
 def stream_builder_thread():
-    pubsub = r.pubsub()
+    print("StreamBuilder Thread Started")
+    r_stream = redis.from_url(REDIS_URL)
+    pubsub = r_stream.pubsub()
     try:
         pubsub.subscribe('novaos:commands')
         print("StreamBuilder Subscribed")
@@ -37,34 +39,37 @@ def stream_builder_thread():
                             headers = {'Authorization': f'Bearer {LEMON_SQUEEZY_API_KEY}'}
                             response = requests.get('https://api.lemonsqueezy.com/v1/stores', headers=headers)
                             if response.status_code == 200:
-                                r.publish('novaos:logs', json.dumps({'event': 'Lemon Squeezy Connected', 'details': 'API connection successful'}))
+                                r_stream.publish('novaos:logs', json.dumps({'event': 'Lemon Squeezy Connected', 'details': 'API connection successful'}))
                                 print("Lemon Squeezy Connected: Success")
                             else:
-                                r.publish('novaos:logs', json.dumps({'event': 'Lemon Squeezy Error', 'details': f'API failed: {response.status_code} {response.text}'}))
+                                r_stream.publish('novaos:logs', json.dumps({'event': 'Lemon Squeezy Error', 'details': f'API failed: {response.status_code} {response.text}'}))
                                 print("Lemon Squeezy Error: " + response.text)
                         elif payload.get('action') == 'launch_streams':
                             count = payload.get('count', 1)
-                            r.publish('novaos:logs', json.dumps({'event': 'Streams Launched', 'details': f"Launched {count} streams with UI/UX."}))
+                            r_stream.publish('novaos:logs', json.dumps({'event': 'Streams Launched', 'details': f"Launched {count} streams with UI/UX."}))
                             print("Streams Launched")
                 except Exception as e:
-                    r.publish('novaos:logs', json.dumps({'event': 'StreamBuilder Error', 'details': str(e)}))
+                    r_stream.publish('novaos:logs', json.dumps({'event': 'StreamBuilder Error', 'details': str(e)}))
                     print("StreamBuilder Error: " + str(e))
     except Exception as e:
         print("StreamBuilder Subscribe Error: " + str(e))
 
 def time_sentinel_thread():
-    print("TimeSentinel Started")
+    print("TimeSentinel Thread Started")
+    r_time = redis.from_url(REDIS_URL)
     while True:
         try:
             optimization = "Monitored streams: Optimized for $25k/month total revenue."
-            r.publish('novaos:logs', json.dumps({'event': 'Optimization Cycle', 'details': optimization}))
+            r_time.publish('novaos:logs', json.dumps({'event': 'Optimization Cycle', 'details': optimization}))
             print("Optimization Cycle")
         except Exception as e:
             print("TimeSentinel Publish Error: " + str(e))
         time.sleep(60)
 
 def dashboard_agent_thread():
-    pubsub = r.pubsub()
+    print("DashboardAgent Thread Started")
+    r_dash = redis.from_url(REDIS_URL)
+    pubsub = r_dash.pubsub()
     try:
         pubsub.subscribe('novaos:commands')
         print("DashboardAgent Subscribed")
@@ -77,10 +82,10 @@ def dashboard_agent_thread():
                         payload = cmd['payload']
                         if payload.get('action') == 'build_dashboard':
                             dashboard = "Built dashboard with UI/UX for streams: status, revenue tracking."
-                            r.publish('novaos:logs', json.dumps({'event': 'Dashboard built', 'details': dashboard}))
+                            r_dash.publish('novaos:logs', json.dumps({'event': 'Dashboard built', 'details': dashboard}))
                             print("Dashboard Built")
                 except Exception as e:
-                    r.publish('novaos:logs', json.dumps({'event': 'DashboardAgent error', 'details': str(e)}))
+                    r_dash.publish('novaos:logs', json.dumps({'event': 'DashboardAgent error', 'details': str(e)}))
                     print("DashboardAgent Error: " + str(e))
     except Exception as e:
         print("DashboardAgent Subscribe Error: " + str(e))
