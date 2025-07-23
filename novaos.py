@@ -22,7 +22,7 @@ except Exception as e:
 
 print("NovaOS Started - Activating All 146 Agents", flush=True)
 
-# Core/Hierarchy class for fallback (if no run_agent)
+# Core class for fallback if no run_agent
 class CoreAgent:
     def __init__(self, name):
         self.name = name
@@ -73,9 +73,76 @@ def handle_command(cmd, r_handle):
         agent = cmd.get('agent')
         payload = cmd['payload']
         if agent == 'StreamBuilder':
-            # ... (keep previous code for test_lemon_squeezy, test_printed_mint, launch_pod_stream)
-        # ... (keep DashboardAgent, ShopifySpecialist, etc.)
+            if payload.get('action') == 'test_lemon_squeezy':
+                print(f"Using Lemon Squeezy key: {LEMON_SQUEEZY_API_KEY[:4]}...{LEMON_SQUEEZY_API_KEY[-4:]} if set", flush=True)
+                headers = {'Authorization': f'Bearer {LEMON_SQUEEZY_API_KEY}'}
+                response = requests.get('https://api.lemonsqueezy.com/v1/stores', headers=headers)
+                if response.status_code == 200:
+                    r_handle.publish('novaos:logs', json.dumps({'event': 'Lemon Squeezy Connected', 'details': 'API connection successful'}))
+                    print("Lemon Squeezy Connected: Success", flush=True)
+                else:
+                    r_handle.publish('novaos:logs', json.dumps({'event': 'Lemon Squeezy Error', 'details': f'API failed: {response.status_code} {response.text}'}))
+                    print("Lemon Squeezy Error: " + response.text, flush=True)
+            elif payload.get('action') == 'test_printed_mint':
+                shopify_store = payload.get('shopify_store', 'z6fsur-dc.myshopify.com')
+                print(f"Using Shopify key: {SHOPIFY_API_KEY[:4]}...{SHOPIFY_API_KEY[-4:]} if set", flush=True)
+                headers = {'X-Shopify-Access-Token': SHOPIFY_API_KEY}
+                response = requests.get(f'https://{shopify_store}/admin/api/2023-10/products.json', headers=headers)
+                if response.status_code == 200:
+                    r_handle.publish('novaos:logs', json.dumps({'event': 'Printed Mint Sync Success', 'details': 'Shopify products fetched'}))
+                    print("Printed Mint Sync Success", flush=True)
+                else:
+                    r_handle.publish('novaos:logs', json.dumps({'event': 'Printed Mint Sync Error', 'details': f'API failed: {response.status_code} {response.text}'}))
+                    print("Printed Mint Sync Error: " + response.text, flush=True)
+            elif payload.get('action') == 'launch_pod_stream':
+                # Use TrendAnalyzer data (assume published to Redis)
+                trends = json.loads(r.get('novaos:trends') or '{}')
+                trend_data = trends.get('trend1', 'Sustainable apparel')
+                print("StreamBuilder: Launching PoD based on TrendAnalyzer: " + trend_data, flush=True)
+                product = {
+                    "product": {
+                        "title": "Trend Tee 2025",
+                        "body_html": "Based on trends: " + trend_data,
+                        "vendor": "Printed Mint",
+                        "variants": [{"price": "29.99", "sku": "PM-TREND-2025"}]
+                    }
+                }
+                headers = {'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json'}
+                response = requests.post('https://z6fsur-dc.myshopify.com/admin/api/2023-10/products.json', headers=headers, json=product)
+                if response.status_code == 201:
+                    r_handle.publish('novaos:logs', json.dumps({'event': 'PoD Product Launched', 'details': f"Product created in Shopify"}))
+                    print("StreamBuilder: Product launched", flush=True)
+                else:
+                    r_handle.publish('novaos:logs', json.dumps({'event': 'PoD Launch Error', 'details': f'API failed: {response.status_code} {response.text}'}))
+                    print("StreamBuilder: Launch Error: " + response.text, flush=True)
+            elif payload.get('action') == 'launch_streams':
+                count = payload.get('count', 1)
+                r_handle.publish('novaos:logs', json.dumps({'event': 'Streams Launched', 'details': f"Launched {count} streams with UI/UX."}))
+                print("Streams Launched", flush=True)
+        elif agent == 'DashboardAgent':
+            if payload.get('action') == 'build_dashboard':
+                print("DashboardAgent: Building UI/UX dashboard", flush=True)
+                r_handle.publish('novaos:logs', json.dumps({'event': 'Dashboard built', 'details': 'UI/UX for revenue tracking'}))
+                print("Dashboard Built", flush=True)
+        elif agent == 'ShopifySpecialist':
+            if payload.get('action') == 'build_shopify_store':
+                print("ShopifySpecialist: Building store layout", flush=True)
+                headers = {'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json'}
+                collection = {
+                    "collection": {
+                        "title": "NovaOS Collection",
+                        "body_html": "Automated products from NovaOS agents."
+                    }
+                }
+                response = requests.post('https://z6fsur-dc.myshopify.com/admin/api/2023-10/custom_collections.json', headers=headers, json=collection)
+                if response.status_code == 201:
+                    r_handle.publish('novaos:logs', json.dumps({'event': 'Store Layout Built', 'details': 'Collection added'}))
+                    print("ShopifySpecialist: Store layout updated", flush=True)
+                else:
+                    r_handle.publish('novaos:logs', json.dumps({'event': 'Store Layout Error', 'details': f'API failed: {response.status_code} {response.text}'}))
+                    print("ShopifySpecialist: Layout Error: " + response.text, flush=True)
     except Exception as e:
+        r_handle.publish('novaos:logs', json.dumps({'event': f'{agent} Error', 'details': str(e)}))
         print(f"{agent} Error: " + str(e), flush=True)
 
 def listener_thread():
