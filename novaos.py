@@ -20,7 +20,7 @@ try:
 except Exception as e:
     print("Redis Connection Error: " + str(e), flush=True)
 
-print("NovaOS Started - Activating All 146 Agents", flush=True)
+print("NovaOS Started - Activating Core 46 Agents Only (Deactivated 100 Streams)", flush=True)
 
 # Core class for fallback if no run_agent
 class CoreAgent:
@@ -32,12 +32,12 @@ class CoreAgent:
             r.publish('novaos:logs', json.dumps({'event': f'{self.name} Cycle', 'details': f'{self.name} active'}))
             time.sleep(300)
 
-# List of 46 specialized agents
+# List of 46 specialized agents (no Streams 1-100)
 agent_dirs = [
     'AgentFactory', 'ai_systems_engineer', 'AnalyticsAgent', 'automation_architect', 'BaserowSync', 'blueprints', 'BuilderAgent', 'BusinessPlanAgent', 'CCO-AUTO', 'CEO-VISION', 'CFO-AUTO', 'CHIEF-STAFF', 'CLARITY-COACH', 'CLO-AUTO', 'CloudManager', 'CMO-AUTO', 'core', 'CPO-AUTO', 'CryptoStreamBuilder', 'CTO-AUTO', 'DashboardAgent', 'DashboardBuilder', 'DockerDeployer', 'DROPBOX-FILE-MANAGER', 'ENERGY-GUARDIAN', 'FileAgent', 'FoundationBuilder', 'GITHUB-DEPLOYER', 'LANGGRAPH-ROUTER', 'LemonSqueezyIntegrator', 'N8N-FLOW-BUILDER', 'NOVA-CORE', 'NovaDashboard', 'NovaHistorian', 'PROMPT-ENGINEER', 'PublerScheduler', 'RENDER-MANAGER', 'RESEARCH-ANALYST', 'RoadmapAgent', 'ShopifyIntegrator', 'TestAgent', 'TimeSentinel', 'TrendAnalyzer', 'TrendFetcher', 'UIUXBuilder'
 ]
 
-# Activate specialized agents
+# Activate 46 specialized agents
 for agent_dir in agent_dirs:
     try:
         module = importlib.import_module(f"agents.{agent_dir}")
@@ -51,22 +51,6 @@ for agent_dir in agent_dirs:
     except Exception as e:
         print(f"{agent_dir} Activation Error: " + str(e), flush=True)
         r.publish('novaos:logs', json.dumps({'event': f'{agent_dir} Error', 'details': str(e)}))
-
-# Stream class for 100 Streams
-class StreamAgent:
-    def __init__(self, stream_id):
-        self.stream_id = stream_id
-    def run(self):
-        print(f"Stream{self.stream_id} Running - Managing stream {self.stream_id}", flush=True)
-        while True:
-            r.publish('novaos:logs', json.dumps({'event': f'Stream{self.stream_id} Cycle', 'details': f'Stream {self.stream_id} active'}))
-            time.sleep(300)
-
-# Activate 100 Streams
-stream_agents = [StreamAgent(i) for i in range(1, 101)]
-for agent in stream_agents:
-    threading.Thread(target=agent.run).start()
-    print(f"Stream{agent.stream_id} Activated", flush=True)
 
 def handle_command(cmd, r_handle):
     try:
@@ -95,7 +79,6 @@ def handle_command(cmd, r_handle):
                     r_handle.publish('novaos:logs', json.dumps({'event': 'Printed Mint Sync Error', 'details': f'API failed: {response.status_code} {response.text}'}))
                     print("Printed Mint Sync Error: " + response.text, flush=True)
             elif payload.get('action') == 'launch_pod_stream':
-                # Use TrendAnalyzer data (assume published to Redis)
                 trends = json.loads(r.get('novaos:trends') or '{}')
                 trend_data = trends.get('trend1', 'Sustainable apparel')
                 print("StreamBuilder: Launching PoD based on TrendAnalyzer: " + trend_data, flush=True)
