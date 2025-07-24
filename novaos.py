@@ -43,7 +43,7 @@ def generate_pdf(content, filename="trends_guide.pdf"):
 def handle_command(cmd, r_handle):
     try:
         agent = cmd.get('agent')
-        payload = cmd.get('payload')
+        payload = cmd['payload']
         if agent == 'StreamBuilder':
             if payload.get('action') == 'launch_digital_stream':
                 # TrendFetcher pulls trends (simulated from web_search)
