@@ -37,8 +37,7 @@ for group in ALL_GROUPS:
         print(f"{agent} Activated in Group", flush=True)
 
 st.title('NovaOS Central Hub')
-st.write('Manage agents, approve actions, view logs. Agents active:')
-st.write(', '.join([agent for group in ALL_GROUPS for agent in group]))
+st.write('Manage agents, approve actions, view logs. Agents active: ' + ', '.join([agent for group in ALL_GROUPS for agent in group]))
 
 st.header('Logs')
 logs = r.lrange('novaos:logs', 0, -1)
@@ -105,13 +104,8 @@ def time_sentinel_thread():
             print(f"TimeSentinel Publish Error: {e}", flush=True)
         time.sleep(60)
 
-def run_dashboard():
-    print("Starting Streamlit Dashboard at http://localhost:8501", flush=True)
-    st.run()
-
 if __name__ == '__main__':
     threading.Thread(target=listener_thread).start()
     threading.Thread(target=time_sentinel_thread).start()
-    threading.Thread(target=run_dashboard).start()
     while True:
         time.sleep(1)
