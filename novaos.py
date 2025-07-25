@@ -5,20 +5,20 @@ import time
 import threading
 import requests
 from dotenv import load_dotenv
-from flask import Flask, render_template_string, request
+import streamlit as st
 
 load_dotenv()
 
 LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
+REDIS_URL = os.getenv('REDIS_URL')
 
 r = redis.from_url(REDIS_URL)
 try:
     r.ping()
     print("Redis Connected Successfully", flush=True)
 except Exception as e:
-    print(f"Redis Connection Error: {e}", flush=True)
+    print("Redis Connection Error: " + str(e), flush=True)
 
 print("NovaOS Started - Activating Corporate Structure", flush=True)
 
@@ -36,31 +36,19 @@ for group in ALL_GROUPS:
     for agent in group:
         print(f"{agent} Activated in Group", flush=True)
 
-app = Flask(__name__)
+st.title('NovaOS Central Hub')
+st.write('Manage agents, approve actions, view logs. Agents active: ' + ', '.join([agent for group in ALL_GROUPS for agent in group]))
 
-@app.route('/dashboard')
-def dashboard():
-    logs = r.lrange('novaos:logs', 0, -1)
-    return render_template_string("""
-    <html>
-    <head><title>NovaOS Dashboard</title></head>
-    <body>
-    <h1>NovaOS Central Hub</h1>
-    <p>Manage agents, approve actions, view logs. Agents active: {{ agents }}</p>
-    <h2>Logs</h2>
-    <ul>
-    {% for log in logs %}
-        <li>{{ log.decode() }}</li>
-    {% endfor %}
-    </ul>
-    <h2>Approve Actions</h2>
-    <form method="POST">
-        <button type="submit" name="approve" value="yes">Approve</button>
-        <button type="submit" name="approve" value="no">Reject</button>
-    </form>
-    </body>
-    </html>
-    """, agents=', '.join([agent for group in ALL_GROUPS for agent in group]), logs=logs)
+st.header('Logs')
+logs = r.lrange('novaos:logs', 0, -1)
+for log in logs:
+    st.write(log.decode())
+
+st.header('Approve Actions')
+if st.button('Approve'):
+    print("Approved via dashboard", flush=True)
+if st.button('Reject'):
+    print("Rejected via dashboard", flush=True)
 
 def handle_command(cmd, r_handle):
     try:
@@ -78,7 +66,7 @@ def handle_command(cmd, r_handle):
                 print("FoundationBuilder: Architecture set", flush=True)
         elif agent == 'DashboardAgent':
             if payload.get('action') == 'build_dashboard':
-                dashboard = "Central Dashboard: View agents, approve actions, monitor logs at http://localhost:5001/dashboard."
+                dashboard = "Central Dashboard: View agents, approve actions, monitor logs at http://localhost:5000/dashboard."
                 r_handle.publish('novaos:logs', json.dumps({'event': 'Dashboard Built', 'details': dashboard}))
                 print("DashboardAgent: Dashboard ready", flush=True)
     except Exception as e:
@@ -117,8 +105,8 @@ def time_sentinel_thread():
         time.sleep(60)
 
 def run_dashboard():
-    print("Starting Flask Dashboard at http://localhost:5001/dashboard", flush=True)
-    app.run(host='0.0.0.0', port=5001)
+    print("Starting Flask Dashboard at http://localhost:5000/dashboard", flush=True)
+    app.run(host='0.0.0.0', port=5000)
 
 if __name__ == '__main__':
     threading.Thread(target=listener_thread).start()
