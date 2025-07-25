@@ -5,7 +5,7 @@ import time
 import threading
 import requests
 from dotenv import load_dotenv
-from flask import Flask, render_template_string, request
+import streamlit as st
 
 load_dotenv()
 
@@ -36,31 +36,20 @@ for group in ALL_GROUPS:
     for agent in group:
         print(f"{agent} Activated in Group", flush=True)
 
-app = Flask(__name__)
+st.title('NovaOS Central Hub')
+st.write('Manage agents, approve actions, view logs. Agents active:')
+st.write(', '.join([agent for group in ALL_GROUPS for agent in group]))
 
-@app.route('/dashboard')
-def dashboard():
-    logs = r.lrange('novaos:logs', 0, -1)
-    return render_template_string("""
-    <html>
-    <head><title>NovaOS Dashboard</title></head>
-    <body>
-    <h1>NovaOS Central Hub</h1>
-    <p>Manage agents, approve actions, view logs. Agents active: {{ agents }}</p>
-    <h2>Logs</h2>
-    <ul>
-    {% for log in logs %}
-        <li>{{ log.decode() }}</li>
-    {% endfor %}
-    </ul>
-    <h2>Approve Actions</h2>
-    <form method="POST">
-        <button type="submit" name="approve" value="yes">Approve</button>
-        <button type="submit" name="approve" value="no">Reject</button>
-    </form>
-    </body>
-    </html>
-    """, agents=', '.join([agent for group in ALL_GROUPS for agent in group]), logs=logs)
+st.header('Logs')
+logs = r.lrange('novaos:logs', 0, -1)
+for log in logs:
+    st.write(log.decode())
+
+st.header('Approve Actions')
+if st.button('Approve'):
+    print("Approved via dashboard", flush=True)
+if st.button('Reject'):
+    print("Rejected via dashboard", flush=True)
 
 def handle_command(cmd, r_handle):
     try:
@@ -117,8 +106,8 @@ def time_sentinel_thread():
         time.sleep(60)
 
 def run_dashboard():
-    print("Starting Flask Dashboard at http://localhost:5000/dashboard", flush=True)
-    app.run(host='0.0.0.0', port=5000)
+    print("Starting Streamlit Dashboard at http://localhost:8501", flush=True)
+    st.run()
 
 if __name__ == '__main__':
     threading.Thread(target=listener_thread).start()
