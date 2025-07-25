@@ -11,14 +11,14 @@ load_dotenv()
 
 LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
-REDIS_URL = os.getenv('REDIS_URL')
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 
 r = redis.from_url(REDIS_URL)
 try:
     r.ping()
     print("Redis Connected Successfully", flush=True)
 except Exception as e:
-    print("Redis Connection Error: " + str(e), flush=True)
+    print(f"Redis Connection Error: {e}", flush=True)
 
 print("NovaOS Started - Activating Corporate Structure", flush=True)
 
@@ -78,7 +78,7 @@ def handle_command(cmd, r_handle):
                 print("FoundationBuilder: Architecture set", flush=True)
         elif agent == 'DashboardAgent':
             if payload.get('action') == 'build_dashboard':
-                dashboard = "Central Dashboard: View agents, approve actions, monitor logs at http://localhost:5000/dashboard."
+                dashboard = "Central Dashboard: View agents, approve actions, monitor logs at http://localhost:5001/dashboard."
                 r_handle.publish('novaos:logs', json.dumps({'event': 'Dashboard Built', 'details': dashboard}))
                 print("DashboardAgent: Dashboard ready", flush=True)
     except Exception as e:
@@ -117,8 +117,8 @@ def time_sentinel_thread():
         time.sleep(60)
 
 def run_dashboard():
-    print("Starting Flask Dashboard at http://localhost:5000/dashboard", flush=True)
-    app.run(host='0.0.0.0', port=5000)
+    print("Starting Flask Dashboard at http://localhost:5001/dashboard", flush=True)
+    app.run(host='0.0.0.0', port=5001)
 
 if __name__ == '__main__':
     threading.Thread(target=listener_thread).start()
