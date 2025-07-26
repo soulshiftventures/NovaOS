@@ -139,12 +139,13 @@ chart = alt.Chart(group_data).mark_bar().encode(
 st.altair_chart(chart, use_container_width=True)
 
 # Placeholder Revenue Map
-st.header('Revenue Map (Placeholder')
+st.header('Revenue Map (Placeholder)')
 fig = px.choropleth(locations=['USA'], locationmode="USA-states", color=[1], scope="usa", labels={'1':'Revenue'})
 st.plotly_chart(fig, use_container_width=True)
 
 def handle_command(cmd, r_handle):
     try:
+        print(f"DEBUG: Command received: {cmd}", flush=True)
         agent = cmd.get('agent')
         payload = cmd.get('payload')
         if agent == 'CEO-VISION':
