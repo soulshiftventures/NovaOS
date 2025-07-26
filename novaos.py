@@ -2,7 +2,7 @@ import os
 import json
 import redis
 import time
-import multiprocessing
+import threading
 from dotenv import load_dotenv
 import streamlit as st
 import pandas as pd
@@ -175,21 +175,26 @@ def handle_command(cmd, r_handle):
     except Exception as e:
         print(f"Command Error: {e}", flush=True)
 
-def listener_process():
-    print("Listener Process Started", flush=True)
-    r = redis.from_url(REDIS_URL)
+def listener_thread():
+    print("Listener Thread Started", flush=True)
     pubsub = r.pubsub(ignore_subscribe_messages=True)
-    pubsub.subscribe('novaos:commands')
-    print("Subscribed to novaos:commands", flush=True)
-    while True:
-        message = pubsub.get_message()
-        if message and message['type'] == 'message':
-            cmd = json.loads(message['data'].decode('utf-8'))
-            print(f"Received command: {cmd}", flush=True)
-            handle_command(cmd, r)
-        time.sleep(0.001)
-
-multiprocessing.Process(target=listener_process).start()
+    try:
+        pubsub.subscribe('novaos:commands')
+        print("Subscribed to novaos:commands", flush=True)
+        counter = 0
+        while True:
+            message = pubsub.get_message()
+            if message and message['type'] == 'message':
+                cmd = json.loads(message['data'].decode('utf-8'))
+                print(f"Received command: {cmd}", flush=True)
+                handle_command(cmd, r)
+            time.sleep(0.001)
+            counter += 1
+            if counter % 60000 == 0:
+                print("Listener Loop Running", flush=True)
+                counter = 0
+    except Exception as e:
+        print(f"Listener Subscribe Error: {e}", flush=True)
 
 def time_sentinel_thread():
     print("TimeSentinel Thread Started", flush=True)
@@ -202,7 +207,9 @@ def time_sentinel_thread():
             print(f"TimeSentinel Publish Error: {e}", flush=True)
         time.sleep(60)
 
-Thread(target=time_sentinel_thread).start()
+threading.Thread(target=listener_thread).start()
+threading.Thread(target=time_sentinel_thread).start()
 
-if __name__ == '__main__':
-    pass
+# Keep main process alive
+while True:
+    time.sleep(1)
