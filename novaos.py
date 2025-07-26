@@ -1,9 +1,9 @@
 import os
 import json
-import redis
+import redis.asyncio as redis
+import asyncio
+from threading import Thread
 import time
-import threading
-import requests
 from dotenv import load_dotenv
 import streamlit as st
 import pandas as pd
@@ -16,25 +16,7 @@ LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 
-# Mock Redis for local testing
-class MockRedis:
-    def lrange(self, key, start, end):
-        return [b'CEO-VISION: Blueprint built', b'FoundationBuilder: Architecture set', b'DashboardAgent: Dashboard ready', b'Optimization Cycle']
-    def set(self, key, value):
-        pass
-    def publish(self, channel, message):
-        pass
-
-# Use mock if local, real if Render
-if os.getenv('RENDER') is None:
-    r = MockRedis()
-else:
-    r = redis.from_url(REDIS_URL)
-    try:
-        r.ping()
-        print("Redis Connected Successfully", flush=True)
-    except Exception as e:
-        print(f"Redis Connection Error: {e}", flush=True)
+async_r = redis.Redis.from_url(REDIS_URL)
 
 print("NovaOS Started - Activating Corporate Structure", flush=True)
 
@@ -107,7 +89,7 @@ st.dataframe(pipeline_data, use_container_width=True)
 # Logs in expander with table
 st.header('Logs')
 with st.expander("View Logs"):
-    logs = r.lrange('novaos:logs', 0, -1)
+    logs = await async_r.lrange('novaos:logs', 0, -1)
     df_logs = pd.DataFrame([log.decode() for log in logs], columns=["Logs"])
     st.dataframe(df_logs, use_container_width=True)
 
@@ -116,12 +98,12 @@ st.header('Approve Actions')
 col1, col2 = st.columns(2)
 with col1:
     if st.button('Approve', key="approve"):
-        r.set('novaos:approval', 'approve')
+        await async_r.set('novaos:approval', 'approve')
         print("Approved via dashboard", flush=True)
         st.success("Approved structure")
 with col2:
     if st.button('Reject', key="reject"):
-        r.set('novaos:approval', 'reject')
+        await async_r.set('novaos:approval', 'reject')
         print("Rejected via dashboard", flush=True)
         st.error("Rejected structure")
 
@@ -143,84 +125,70 @@ st.header('Revenue Map (Placeholder)')
 fig = px.choropleth(locations=['USA'], locationmode="USA-states", color=[1], scope="usa", labels={'1':'Revenue'})
 st.plotly_chart(fig, use_container_width=True)
 
-def handle_command(cmd, r_handle):
+async def handle_command(cmd, r_handle):
     try:
-        print(f"DEBUG: Command received: {cmd}", flush=True)
         agent = cmd.get('agent')
         payload = cmd.get('payload')
         if agent == 'CEO-VISION':
             if payload.get('action') == 'build_blueprint':
                 blueprint = "NovaOS Blueprint: C-Suite oversees strategy, Foundational sets up business, Analytics drives data, Builders/Tools execute, Specialized handles tasks. Replicable for 100+ streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Blueprint Built', 'details': blueprint}))
+                await r_handle.publish('novaos:logs', json.dumps({'event': 'Blueprint Built', 'details': blueprint}))
                 print("CEO-VISION: Blueprint built", flush=True)
         elif agent == 'FoundationBuilder':
             if payload.get('action') == 'setup_business':
                 setup = "Business Architecture: Shopify hub, Lemon Squeezy payments, Redis for data. Ready for streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Business Setup', 'details': setup}))
+                await r_handle.publish('novaos:logs', json.dumps({'event': 'Business Setup', 'details': setup}))
                 print("FoundationBuilder: Architecture set", flush=True)
         elif agent == 'DashboardAgent':
             if payload.get('action') == 'build_dashboard':
                 dashboard = "Central Dashboard: View agents, approve actions, monitor logs at the deployed URL."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Dashboard Built', 'details': dashboard}))
+                await r_handle.publish('novaos:logs', json.dumps({'event': 'Dashboard Built', 'details': dashboard}))
                 print("DashboardAgent: Dashboard ready", flush=True)
         elif agent == 'DEVOPS-ENGINEER':
             if payload.get('action') == 'migrate_stack':
                 migration = "Migration Started: Setup WooCommerce on Vercel, integrate Stripe/Printful/Supabase/Alchemy for streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Started', 'details': migration}))
+                await r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Started', 'details': migration}))
                 print("DEVOPS-ENGINEER: Migration to new stack initiated", flush=True)
                 # Simulate migration steps
                 print("DEVOPS-ENGINEER: Cloning WooCommerce repo to Vercel...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Cloning WooCommerce to Vercel'}))
-                time.sleep(1)
+                await r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Cloning WooCommerce to Vercel'}))
+                await asyncio.sleep(1)
                 print("DEVOPS-ENGINEER: Integrating Stripe API...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Stripe'}))
-                time.sleep(1)
+                await r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Stripe'}))
+                await asyncio.sleep(1)
                 print("DEVOPS-ENGINEER: Integrating Printful API...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Printful'}))
-                time.sleep(1)
+                await r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Printful'}))
+                await asyncio.sleep(1)
                 print("DEVOPS-ENGINEER: Setting up Supabase DB...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Setting up Supabase'}))
-                time.sleep(1)
+                await r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Setting up Supabase'}))
+                await asyncio.sleep(1)
                 print("DEVOPS-ENGINEER: Integrating Alchemy for tokenized assets...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Alchemy'}))
-                time.sleep(1)
+                await r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Alchemy'}))
+                await asyncio.sleep(1)
                 print("DEVOPS-ENGINEER: Migration Completed", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Completed', 'details': 'New stack ready for streams'}))
+                await r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Completed', 'details': 'New stack ready for streams'}))
     except Exception as e:
         print(f"Command Error: {e}", flush=True)
 
-def listener_thread():
-    print("Listener Thread Started", flush=True)
-    pubsub = r.pubsub(ignore_subscribe_messages=True)
-    try:
-        pubsub.subscribe('novaos:commands')
-        print("Subscribed to novaos:commands", flush=True)
-        counter = 0
-        while True:
-            message = pubsub.get_message()
-            if message and message['type'] == 'message':
-                cmd = json.loads(message['data'].decode('utf-8'))
-                print(f"Received command: {cmd}", flush=True)
-                handle_command(cmd, r)
-            time.sleep(0.001)
-            counter += 1
-            if counter % 60000 == 0:
-                print("Listener Loop Running", flush=True)
-                counter = 0
-    except Exception as e:
-        print(f"Listener Subscribe Error: {e}", flush=True)
+def start_loop(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
 
-def time_sentinel_thread():
-    print("TimeSentinel Thread Started", flush=True)
+new_loop = asyncio.new_event_loop()
+t = Thread(target=start_loop, args=(new_loop,))
+t.start()
+
+new_loop.call_soon_threadsafe(new_loop.create_task, handle_command(cmd, async_r))
+
+async def time_sentinel_thread():
     while True:
         try:
             optimization = "Monitored streams: Optimized for $25k/month total revenue."
-            r.publish('novaos:logs', json.dumps({'event': 'Optimization Cycle', 'details': optimization}))
+            await async_r.publish('novaos:logs', json.dumps({'event': 'Optimization Cycle', 'details': optimization}))
             print("Optimization Cycle", flush=True)
         except Exception as e:
             print(f"TimeSentinel Publish Error: {e}", flush=True)
-        time.sleep(60)
+        await asyncio.sleep(60)
 
-if __name__ == '__main__':
-    threading.Thread(target=listener_thread).start()
-    threading.Thread(target=time_sentinel_thread).start()
+new_loop.call_soon_threadsafe(new_loop.create_task, time_sentinel_thread())
+
