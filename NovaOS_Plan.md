@@ -4,7 +4,7 @@
 NovaOS is a stealth AI backend empire automating 100+ diverse income streams (digital products, affiliates, SaaS, tokenized assets) to fund personal goals. Public-facing content teases insights, sparking creativity without how-to specifics. Short-term: 5k/month by Aug 4, 2025 (from July 26, 2025). Long-term: Billions via scalable, tokenized ecosystems. Differentiation: Proprietary data, ethical AI, audience flywheels, valuation-boosting documentation, trend-setting in untapped pains (e.g., grief therapy, scientific discovery).
 
 ## Agent Hierarchy
-Coordinated via Redis. Infrastructure: Shopify hub, Lemon Squeezy payments, Printed Mint PoD (sync fixed), Render (Streamlit dashboard, port 8501). Env vars: REDIS_URL=redis://default:qzGkLOVr1Eyde9b6F0Mk87nYrOKFov4S@red-d1u794c9c44c73cmjbf0:6379, SHOPIFY_API_KEY=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, LEMON_SQUEEZY_API_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI5MDEwNDE4MiIsImp0aSI6IjE0ZjU0ZmQ5NjM0Mzc3ZWEyZGEyMjE0Z2M1YzA1MmM3Y2I2ZDM5Y2Q5N2E1OTQxYmFiZjFiY2Y4ZGM4M2FhNGRiZ2Y0Z2MxNzQ3Z2NX. Generic Stream agents deactivated.
+Coordinated via Redis. Infrastructure: Shopify hub, Lemon Squeezy payments, Printed Mint PoD (sync fixed), Render (Streamlit dashboard, port 8501). Env vars: REDIS_URL=[REDACTED], SHOPIFY_API_KEY=[REDACTED], LEMON_SQUEEZY_API_KEY=[REDACTED]. Generic Stream agents deactivated.
 
 - **C-Suite**: CEO-VISION, CFO-AUTO, CTO-AUTO, CMO-AUTO, CPO-AUTO, CCO-AUTO, CHIEF-STAFF, CLARITY-COACH, CLO-AUTO.
 - **Foundational**: AgentFactory, FoundationBuilder, NOVA-CORE, NovaHistorian.
