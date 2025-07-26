@@ -16,21 +16,12 @@ LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 
-# Mock Redis for local testing
-class MockRedis:
-    def lrange(self, key, start, end):
-        return [b'CEO-VISION: Blueprint built', b'FoundationBuilder: Architecture set', b'DashboardAgent: Dashboard ready', b'Optimization Cycle']
-
-# Use mock if local, real if Render
-if os.getenv('RENDER') is None:
-    r = MockRedis()
-else:
-    r = redis.from_url(REDIS_URL)
-    try:
-        r.ping()
-        print("Redis Connected Successfully", flush=True)
-    except Exception as e:
-        print(f"Redis Connection Error: {e}", flush=True)
+r = redis.from_url(REDIS_URL)
+try:
+    r.ping()
+    print("Redis Connected Successfully", flush=True)
+except Exception as e:
+    print(f"Redis Connection Error: {e}", flush=True)
 
 print("NovaOS Started - Activating Corporate Structure", flush=True)
 
@@ -73,24 +64,34 @@ if phase != 'All Industries':
 else:
     st.sidebar.write("AI and ML, Ecommerce, Finance, Government, Healthcare, Manufacture and Warehouse, Real Estate, Transportation, Travel")
 
-st.write('Agents active: ' + ', '.join([agent for group in ALL_GROUPS for agent in group]))
+# Agents in expander with table
+with st.expander("Agents Active (46 Total)"):
+    agents_list = [agent for group in ALL_GROUPS for agent in group]
+    df_agents = pd.DataFrame(agents_list, columns=["Agents"])
+    st.dataframe(df_agents, use_container_width=True)
 
+# Logs in expander with table
 st.header('Logs')
-logs = r.lrange('novaos:logs', 0, -1)
-for log in logs:
-    st.write(log.decode())
+with st.expander("View Logs"):
+    logs = r.lrange('novaos:logs', 0, -1)
+    df_logs = pd.DataFrame([log.decode() for log in logs], columns=["Logs"])
+    st.dataframe(df_logs, use_container_width=True)
 
+# Approve Actions
 st.header('Approve Actions')
 col1, col2 = st.columns(2)
 with col1:
     if st.button('Approve', key="approve"):
+        r.set('novaos:approval', 'approve')
         print("Approved via dashboard", flush=True)
         st.success("Approved structure")
 with col2:
     if st.button('Reject', key="reject"):
+        r.set('novaos:approval', 'reject')
         print("Rejected via dashboard", flush=True)
         st.error("Rejected structure")
 
+# Example Chart: Agent Groups
 st.header('Agent Groups Overview')
 group_data = pd.DataFrame({
     'Group': ['C-Suite', 'Foundational', 'Analytics', 'Builders', 'Tools', 'Specialized'],
@@ -103,6 +104,7 @@ chart = alt.Chart(group_data).mark_bar().encode(
 ).properties(width=600, height=400)
 st.altair_chart(chart, use_container_width=True)
 
+# Example Map: Placeholder for Revenue/Business Metrics
 st.header('Revenue Map (Placeholder)')
 fig = px.choropleth(locations=['USA'], locationmode="USA-states", color=[1], scope="usa", labels={'1':'Revenue'})
 st.plotly_chart(fig, use_container_width=True)
