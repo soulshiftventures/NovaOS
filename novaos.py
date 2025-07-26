@@ -43,32 +43,27 @@ st.set_page_config(page_title="NovaOS Central Hub", page_icon="🚀", layout="wi
 
 st.title('NovaOS Central Hub')
 
-# Sidebar for Fuselab-like phases
-st.sidebar.title('Phases')
-phase = st.sidebar.selectbox('Select Phase', ['Discovery', 'AI UX Research', 'Planning', 'Creation', 'Testing', 'Finalizing', 'All Industries'])
+# Tabs for Phases (more prominent)
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(['Discovery', 'AI UX Research', 'Planning', 'Creation', 'Testing', 'Finalizing', 'All Industries'])
 
-if phase != 'All Industries':
-    st.sidebar.write(f"Capabilities for {phase}:")
-    if phase == 'Discovery':
-        st.sidebar.write("Problem to Solve, Target Audience, Creative Brief, Constraints, Stakeholder Interviews")
-    elif phase == 'AI UX Research':
-        st.sidebar.write("User Research, Personas, User Behaviors, Competitor Analysis, Data Analysis")
-    elif phase == 'Planning':
-        st.sidebar.write("Project / Product Goals, Resource Allocation, Project Planning, Documentation, Ideation")
-    elif phase == 'Creation':
-        st.sidebar.write("Sketches, Wireframes, Use Case Flows, Functionality, Low & High Fidelity Prototypes, A/B Testing")
-    elif phase == 'Testing':
-        st.sidebar.write("Usability Testing, Evaluation, Beta launch, Final User Feedback, Heuristic Evaluations, Final Refinements")
-    elif phase == 'Finalizing':
-        st.sidebar.write("Ordering, Packaging, Documentation, Rollout Plan, Go Live, Project Lessons / Debrief")
-else:
-    st.sidebar.write("AI and ML, Ecommerce, Finance, Government, Healthcare, Manufacture and Warehouse, Real Estate, Transportation, Travel")
+with tab1:
+    st.write("Problem to Solve, Target Audience, Creative Brief, Constraints, Stakeholder Interviews")
+with tab2:
+    st.write("User Research, Personas, User Behaviors, Competitor Analysis, Data Analysis")
+with tab3:
+    st.write("Project / Product Goals, Resource Allocation, Project Planning, Documentation, Ideation")
+with tab4:
+    st.write("Sketches, Wireframes, Use Case Flows, Functionality, Low & High Fidelity Prototypes, A/B Testing")
+with tab5:
+    st.write("Usability Testing, Evaluation, Beta launch, Final User Feedback, Heuristic Evaluations, Final Refinements")
+with tab6:
+    st.write("Ordering, Packaging, Documentation, Rollout Plan, Go Live, Project Lessons / Debrief")
+with tab7:
+    st.write("AI and ML, Ecommerce, Finance, Government, Healthcare, Manufacture and Warehouse, Real Estate, Transportation, Travel")
 
-# Agents in expander with table
-with st.expander("Agents Active (46 Total)"):
-    agents_list = [agent for group in ALL_GROUPS for agent in group]
-    df_agents = pd.DataFrame(agents_list, columns=["Agents"])
-    st.dataframe(df_agents, use_container_width=True)
+# Agents in sidebar
+st.sidebar.title('Agents Active (46 Total)')
+st.sidebar.write(', '.join([agent for group in ALL_GROUPS for agent in group]))
 
 # Logs in expander with table
 st.header('Logs')
@@ -116,17 +111,17 @@ def handle_command(cmd, r_handle):
         if agent == 'CEO-VISION':
             if payload.get('action') == 'build_blueprint':
                 blueprint = "NovaOS Blueprint: C-Suite oversees strategy, Foundational sets up business, Analytics drives data, Builders/Tools execute, Specialized handles tasks. Replicable for 100+ streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Blueprint Built', 'details': blueprint}))
+                r.publish('novaos:logs', json.dumps({'event': 'Blueprint Built', 'details': blueprint}))
                 print("CEO-VISION: Blueprint built", flush=True)
         elif agent == 'FoundationBuilder':
             if payload.get('action') == 'setup_business':
                 setup = "Business Architecture: Shopify hub, Lemon Squeezy payments, Redis for data. Ready for streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Business Setup', 'details': setup}))
+                r.publish('novaos:logs', json.dumps({'event': 'Business Setup', 'details': setup}))
                 print("FoundationBuilder: Architecture set", flush=True)
         elif agent == 'DashboardAgent':
             if payload.get('action') == 'build_dashboard':
                 dashboard = "Central Dashboard: View agents, approve actions, monitor logs at the deployed URL."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Dashboard Built', 'details': dashboard}))
+                r.publish('novaos:logs', json.dumps({'event': 'Dashboard Built', 'details': dashboard}))
                 print("DashboardAgent: Dashboard ready", flush=True)
     except Exception as e:
         print(f"Command Error: {e}", flush=True)
