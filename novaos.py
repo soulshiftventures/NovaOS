@@ -146,7 +146,7 @@ st.plotly_chart(fig, use_container_width=True)
 def handle_command(cmd, r_handle):
     try:
         agent = cmd.get('agent')
-        payload = cmd['payload']
+        payload = cmd.get('payload')
         if agent == 'CEO-VISION':
             if payload.get('action') == 'build_blueprint':
                 blueprint = "NovaOS Blueprint: C-Suite oversees strategy, Foundational sets up business, Analytics drives data, Builders/Tools execute, Specialized handles tasks. Replicable for 100+ streams."
@@ -162,6 +162,11 @@ def handle_command(cmd, r_handle):
                 dashboard = "Central Dashboard: View agents, approve actions, monitor logs at the deployed URL."
                 r_handle.publish('novaos:logs', json.dumps({'event': 'Dashboard Built', 'details': dashboard}))
                 print("DashboardAgent: Dashboard ready", flush=True)
+        elif agent == 'DEVOPS-ENGINEER':
+            if payload.get('action') == 'migrate_stack':
+                migration = "Migration Started: Setup WooCommerce on Vercel, integrate Stripe/Printful/Supabase/Alchemy for streams."
+                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Started', 'details': migration}))
+                print("DEVOPS-ENGINEER: Migration to new stack initiated", flush=True)
     except Exception as e:
         print(f"Command Error: {e}", flush=True)
 
