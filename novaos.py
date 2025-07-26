@@ -16,12 +16,21 @@ LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 
-r = redis.from_url(REDIS_URL)
-try:
-    r.ping()
-    print("Redis Connected Successfully", flush=True)
-except Exception as e:
-    print(f"Redis Connection Error: {e}", flush=True)
+# Mock Redis for local testing
+class MockRedis:
+    def lrange(self, key, start, end):
+        return [b'CEO-VISION: Blueprint built', b'FoundationBuilder: Architecture set', b'DashboardAgent: Dashboard ready', b'Optimization Cycle']
+
+# Use mock if local, real if Render
+if os.getenv('RENDER') is None:
+    r = MockRedis()
+else:
+    r = redis.from_url(REDIS_URL)
+    try:
+        r.ping()
+        print("Redis Connected Successfully", flush=True)
+    except Exception as e:
+        print(f"Redis Connection Error: {e}", flush=True)
 
 print("NovaOS Started - Activating Corporate Structure", flush=True)
 
@@ -43,38 +52,45 @@ st.set_page_config(page_title="NovaOS Central Hub", page_icon="🚀", layout="wi
 
 st.title('NovaOS Central Hub')
 
-# Sidebar for navigation
-st.sidebar.title('Controls')
-selected_group = st.sidebar.selectbox('Select Agent Group', ['All'] + ['C-Suite', 'Foundational', 'Analytics', 'Builders', 'Tools', 'Specialized'])
+# Sidebar for Fuselab-like phases
+st.sidebar.title('Phases')
+phase = st.sidebar.selectbox('Select Phase', ['Discovery', 'AI UX Research', 'Planning', 'Creation', 'Testing', 'Finalizing', 'All Industries'])
 
-# Agent list as dataframe
-agents_list = [agent for group in ALL_GROUPS for agent in group]
-df_agents = pd.DataFrame(agents_list, columns=["Agents"])
-st.write('Agents active:')
-st.dataframe(df_agents, use_container_width=True)
+if phase != 'All Industries':
+    st.sidebar.write(f"Capabilities for {phase}:")
+    if phase == 'Discovery':
+        st.sidebar.write("Problem to Solve, Target Audience, Creative Brief, Constraints, Stakeholder Interviews")
+    elif phase == 'AI UX Research':
+        st.sidebar.write("User Research, Personas, User Behaviors, Competitor Analysis, Data Analysis")
+    elif phase == 'Planning':
+        st.sidebar.write("Project / Product Goals, Resource Allocation, Project Planning, Documentation, Ideation")
+    elif phase == 'Creation':
+        st.sidebar.write("Sketches, Wireframes, Use Case Flows, Functionality, Low & High Fidelity Prototypes, A/B Testing")
+    elif phase == 'Testing':
+        st.sidebar.write("Usability Testing, Evaluation, Beta launch, Final User Feedback, Heuristic Evaluations, Final Refinements")
+    elif phase == 'Finalizing':
+        st.sidebar.write("Ordering, Packaging, Documentation, Rollout Plan, Go Live, Project Lessons / Debrief")
+else:
+    st.sidebar.write("AI and ML, Ecommerce, Finance, Government, Healthcare, Manufacture and Warehouse, Real Estate, Transportation, Travel")
 
-# Logs in expander with table
+st.write('Agents active: ' + ', '.join([agent for group in ALL_GROUPS for agent in group]))
+
 st.header('Logs')
-with st.expander("View Logs"):
-    logs = r.lrange('novaos:logs', 0, -1)
-    df_logs = pd.DataFrame([log.decode() for log in logs], columns=["Logs"])
-    st.dataframe(df_logs, use_container_width=True)
+logs = r.lrange('novaos:logs', 0, -1)
+for log in logs:
+    st.write(log.decode())
 
-# Approve Actions
 st.header('Approve Actions')
 col1, col2 = st.columns(2)
 with col1:
     if st.button('Approve', key="approve"):
-        r.set('novaos:approval', 'approve')
         print("Approved via dashboard", flush=True)
         st.success("Approved structure")
 with col2:
     if st.button('Reject', key="reject"):
-        r.set('novaos:approval', 'reject')
         print("Rejected via dashboard", flush=True)
         st.error("Rejected structure")
 
-# Example Chart: Agent Groups
 st.header('Agent Groups Overview')
 group_data = pd.DataFrame({
     'Group': ['C-Suite', 'Foundational', 'Analytics', 'Builders', 'Tools', 'Specialized'],
@@ -87,7 +103,6 @@ chart = alt.Chart(group_data).mark_bar().encode(
 ).properties(width=600, height=400)
 st.altair_chart(chart, use_container_width=True)
 
-# Example Map: Placeholder for Revenue/Business Metrics
 st.header('Revenue Map (Placeholder)')
 fig = px.choropleth(locations=['USA'], locationmode="USA-states", color=[1], scope="usa", labels={'1':'Revenue'})
 st.plotly_chart(fig, use_container_width=True)
@@ -149,5 +164,3 @@ def time_sentinel_thread():
 if __name__ == '__main__':
     threading.Thread(target=listener_thread).start()
     threading.Thread(target=time_sentinel_thread).start()
-    while True:
-        time.sleep(1)
