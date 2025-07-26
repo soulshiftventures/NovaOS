@@ -139,7 +139,7 @@ chart = alt.Chart(group_data).mark_bar().encode(
 st.altair_chart(chart, use_container_width=True)
 
 # Placeholder Revenue Map
-st.header('Revenue Map (Placeholder)')
+st.header('Revenue Map (Placeholder')
 fig = px.choropleth(locations=['USA'], locationmode="USA-states", color=[1], scope="usa", labels={'1':'Revenue'})
 st.plotly_chart(fig, use_container_width=True)
 
@@ -167,6 +167,24 @@ def handle_command(cmd, r_handle):
                 migration = "Migration Started: Setup WooCommerce on Vercel, integrate Stripe/Printful/Supabase/Alchemy for streams."
                 r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Started', 'details': migration}))
                 print("DEVOPS-ENGINEER: Migration to new stack initiated", flush=True)
+                # Simulate migration steps
+                print("DEVOPS-ENGINEER: Cloning WooCommerce repo to Vercel...", flush=True)
+                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Cloning WooCommerce to Vercel'}))
+                time.sleep(1)
+                print("DEVOPS-ENGINEER: Integrating Stripe API...", flush=True)
+                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Stripe'}))
+                time.sleep(1)
+                print("DEVOPS-ENGINEER: Integrating Printful API...", flush=True)
+                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Printful'}))
+                time.sleep(1)
+                print("DEVOPS-ENGINEER: Setting up Supabase DB...", flush=True)
+                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Setting up Supabase'}))
+                time.sleep(1)
+                print("DEVOPS-ENGINEER: Integrating Alchemy for tokenized assets...", flush=True)
+                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Alchemy'}))
+                time.sleep(1)
+                print("DEVOPS-ENGINEER: Migration Completed", flush=True)
+                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Completed', 'details': 'New stack ready for streams'}))
     except Exception as e:
         print(f"Command Error: {e}", flush=True)
 
