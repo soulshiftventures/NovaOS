@@ -4,7 +4,6 @@ import redis
 import time
 import threading
 import requests
-import subprocess
 from dotenv import load_dotenv
 import streamlit as st
 
@@ -37,24 +36,23 @@ for group in ALL_GROUPS:
     for agent in group:
         print(f"{agent} Activated in Group", flush=True)
 
-def streamlit_dashboard():
-    st.title('NovaOS Central Hub')
-    st.write('Manage agents, approve actions, view logs. Agents active: ' + ', '.join([agent for group in ALL_GROUPS for agent in group]))
+st.title('NovaOS Central Hub')
+st.write('Manage agents, approve actions, view logs. Agents active: ' + ', '.join([agent for group in ALL_GROUPS for agent in group]))
 
-    st.header('Logs')
-    logs = r.lrange('novaos:logs', 0, -1)
-    for log in logs:
-        st.write(log.decode())
+st.header('Logs')
+logs = r.lrange('novaos:logs', 0, -1)
+for log in logs:
+    st.write(log.decode())
 
-    st.header('Approve Actions')
-    if st.button('Approve'):
-        r.set('novaos:approval', 'approve')
-        print("Approved via dashboard", flush=True)
-        st.success("Approved structure")
-    if st.button('Reject'):
-        r.set('novaos:approval', 'reject')
-        print("Rejected via dashboard", flush=True)
-        st.error("Rejected structure")
+st.header('Approve Actions')
+if st.button('Approve'):
+    r.set('novaos:approval', 'approve')
+    print("Approved via dashboard", flush=True)
+    st.success("Approved structure")
+if st.button('Reject'):
+    r.set('novaos:approval', 'reject')
+    print("Rejected via dashboard", flush=True)
+    st.error("Rejected structure")
 
 def handle_command(cmd, r_handle):
     try:
@@ -72,7 +70,7 @@ def handle_command(cmd, r_handle):
                 print("FoundationBuilder: Architecture set", flush=True)
         elif agent == 'DashboardAgent':
             if payload.get('action') == 'build_dashboard':
-                dashboard = "Central Dashboard: View agents, approve actions, monitor logs at http://localhost:8501."
+                dashboard = "Central Dashboard: View agents, approve actions, monitor logs at the deployed URL."
                 r_handle.publish('novaos:logs', json.dumps({'event': 'Dashboard Built', 'details': dashboard}))
                 print("DashboardAgent: Dashboard ready", flush=True)
     except Exception as e:
@@ -110,13 +108,6 @@ def time_sentinel_thread():
             print(f"TimeSentinel Publish Error: {e}", flush=True)
         time.sleep(60)
 
-def run_dashboard():
-    print("Starting Streamlit Dashboard at http://localhost:8501", flush=True)
-    subprocess.run(['streamlit', 'run', 'novaos.py', '--server.port', '8501'])
-
 if __name__ == '__main__':
     threading.Thread(target=listener_thread).start()
     threading.Thread(target=time_sentinel_thread).start()
-    threading.Thread(target=run_dashboard).start()
-    while True:
-        time.sleep(1)
