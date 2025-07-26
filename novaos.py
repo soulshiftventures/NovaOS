@@ -6,6 +6,9 @@ import threading
 import requests
 from dotenv import load_dotenv
 import streamlit as st
+import pandas as pd
+import altair as alt
+import plotly.express as px
 
 load_dotenv()
 
@@ -36,23 +39,58 @@ for group in ALL_GROUPS:
     for agent in group:
         print(f"{agent} Activated in Group", flush=True)
 
+st.set_page_config(page_title="NovaOS Central Hub", page_icon="🚀", layout="wide")
+
 st.title('NovaOS Central Hub')
-st.write('Manage agents, approve actions, view logs. Agents active: ' + ', '.join([agent for group in ALL_GROUPS for agent in group]))
 
+# Sidebar for navigation
+st.sidebar.title('Controls')
+selected_group = st.sidebar.selectbox('Select Agent Group', ['All'] + ['C-Suite', 'Foundational', 'Analytics', 'Builders', 'Tools', 'Specialized'])
+
+# Agent list as dataframe
+agents_list = [agent for group in ALL_GROUPS for agent in group]
+df_agents = pd.DataFrame(agents_list, columns=["Agents"])
+st.write('Agents active:')
+st.dataframe(df_agents, use_container_width=True)
+
+# Logs in expander with table
 st.header('Logs')
-logs = r.lrange('novaos:logs', 0, -1)
-for log in logs:
-    st.write(log.decode())
+with st.expander("View Logs"):
+    logs = r.lrange('novaos:logs', 0, -1)
+    df_logs = pd.DataFrame([log.decode() for log in logs], columns=["Logs"])
+    st.dataframe(df_logs, use_container_width=True)
 
+# Approve Actions
 st.header('Approve Actions')
-if st.button('Approve'):
-    r.set('novaos:approval', 'approve')
-    print("Approved via dashboard", flush=True)
-    st.success("Approved structure")
-if st.button('Reject'):
-    r.set('novaos:approval', 'reject')
-    print("Rejected via dashboard", flush=True)
-    st.error("Rejected structure")
+col1, col2 = st.columns(2)
+with col1:
+    if st.button('Approve', key="approve"):
+        r.set('novaos:approval', 'approve')
+        print("Approved via dashboard", flush=True)
+        st.success("Approved structure")
+with col2:
+    if st.button('Reject', key="reject"):
+        r.set('novaos:approval', 'reject')
+        print("Rejected via dashboard", flush=True)
+        st.error("Rejected structure")
+
+# Example Chart: Agent Groups
+st.header('Agent Groups Overview')
+group_data = pd.DataFrame({
+    'Group': ['C-Suite', 'Foundational', 'Analytics', 'Builders', 'Tools', 'Specialized'],
+    'Count': [9, 4, 6, 6, 16, 6]
+})
+chart = alt.Chart(group_data).mark_bar().encode(
+    x='Group',
+    y='Count',
+    color='Group'
+).properties(width=600, height=400)
+st.altair_chart(chart, use_container_width=True)
+
+# Example Map: Placeholder for Revenue/Business Metrics
+st.header('Revenue Map (Placeholder)')
+fig = px.choropleth(locations=['USA'], locationmode="USA-states", color=[1], scope="usa", labels={'1':'Revenue'})
+st.plotly_chart(fig, use_container_width=True)
 
 def handle_command(cmd, r_handle):
     try:
@@ -111,3 +149,5 @@ def time_sentinel_thread():
 if __name__ == '__main__':
     threading.Thread(target=listener_thread).start()
     threading.Thread(target=time_sentinel_thread).start()
+    while True:
+        time.sleep(1)
