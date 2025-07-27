@@ -111,31 +111,6 @@ with col2:
         print("Rejected via dashboard", flush=True)
         st.error("Rejected structure")
 
-# Trigger Migration Button
-st.header('Trigger Migration')
-if st.button('Trigger Migration', key="migration"):
-    print("DEVOPS-ENGINEER: Migration to new stack initiated", flush=True)
-    r.publish('novaos:logs', json.dumps({'event': 'Migration Started', 'details': 'Setup WooCommerce on Vercel, integrate Stripe/Printful/Supabase/Alchemy for streams'}))
-    time.sleep(1)
-    print("DEVOPS-ENGINEER: Cloning WooCommerce repo to Vercel...", flush=True)
-    r.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Cloning WooCommerce to Vercel'}))
-    time.sleep(1)
-    print("DEVOPS-ENGINEER: Integrating Stripe API...", flush=True)
-    r.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Stripe'}))
-    time.sleep(1)
-    print("DEVOPS-ENGINEER: Integrating Printful API...", flush=True)
-    r.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Printful'}))
-    time.sleep(1)
-    print("DEVOPS-ENGINEER: Setting up Supabase DB...", flush=True)
-    r.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Setting up Supabase'}))
-    time.sleep(1)
-    print("DEVOPS-ENGINEER: Integrating Alchemy for tokenized assets...", flush=True)
-    r.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Alchemy'}))
-    time.sleep(1)
-    print("DEVOPS-ENGINEER: Migration Completed", flush=True)
-    r.publish('novaos:logs', json.dumps({'event': 'Migration Completed', 'details': 'New stack ready for streams'}))
-    st.success("Migration triggered and completed")
-
 # System Overview Chart
 st.header('System Overview')
 group_data = pd.DataFrame({
@@ -237,4 +212,4 @@ threading.Thread(target=time_sentinel_thread).start()
 
 # Keep main process alive
 while True:
-    time.sleep(60)
+    time.sleep(1)
