@@ -95,7 +95,7 @@ st.dataframe(df_agents, use_container_width=True, column_config={
 })
 
 # Income Stream Pipeline
-st.header('Income Stream Pipeline (Placeholder for monitoring isolated streams (each in Docker containers).")
+st.header('Income Stream Pipeline (Placeholder for monitoring isolated streams (each in Docker containers).')
 pipeline_data = pd.DataFrame([
     {'Stream': 'Stream 1', 'Status': 'Planning', 'Revenue': 0, 'Container': 'docker-stream1'},
     {'Stream': 'Stream 2', 'Status': 'Testing', 'Revenue': 0, 'Container': 'docker-stream2'}
