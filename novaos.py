@@ -23,6 +23,13 @@ class MockRedis:
         pass
     def publish(self, channel, message):
         pass
+    def pubsub(self, ignore_subscribe_messages=True):
+        class MockPubSub:
+            def subscribe(self, channel):
+                pass
+            def get_message(self):
+                return None
+        return MockPubSub()
 
 # Use mock if local, real if Render
 if os.getenv('RENDER') is None:
