@@ -1,10 +1,10 @@
 # NovaOS Comprehensive Plan
 
 ## Vision and Goals
-NovaOS is a stealth AI backend empire automating 100+ diverse income streams (digital products, affiliates, SaaS, tokenized assets) to fund personal goals. Public-facing content teases insights, sparking creativity without how-to specifics. Short-term: 5k/month by Aug 4, 2025 (from July 26, 2025). Long-term: Billions via scalable, tokenized ecosystems. Differentiation: Proprietary data, ethical AI, audience flywheels, valuation-boosting documentation, trend-setting in untapped pains (e.g., grief therapy, scientific discovery).
+NovaOS is a stealth AI backend empire automating 100+ diverse income streams (digital products, affiliates, SaaS, tokenized assets) to fund personal goals. Public-facing content teases insights, sparking creativity without how-to specifics. Short-term: 5k/month by Aug 4, 2025 (from July 27, 2025). Long-term: Billions via scalable, tokenized ecosystems. Differentiation: Proprietary data, ethical AI, audience flywheels, valuation-boosting documentation, trend-setting in untapped pains (e.g., grief therapy, scientific discovery).
 
 ## Agent Hierarchy
-Coordinated via Redis. Infrastructure: Shopify hub, Lemon Squeezy payments, Printed Mint PoD (sync fixed), Render (Streamlit dashboard, port 8501). Env vars: REDIS_URL=[REDACTED], SHOPIFY_API_KEY=[REDACTED], LEMON_SQUEEZY_API_KEY=[REDACTED]. Generic Stream agents deactivated.
+Coordinated via Redis. Infrastructure: Hybrid - Shopify/Printed Mint for PoD, WooCommerce on Vercel for e-com, Stripe for payments, Printful for PoD, Supabase for DB/realtime, Alchemy for tokenized. Env vars: REDIS_URL=[REDACTED], SHOPIFY_API_KEY=[REDACTED], LEMON_SQUEEZY_API_KEY=[REDACTED]. Generic Stream agents deactivated.
 
 - **C-Suite**: CEO-VISION, CFO-AUTO, CTO-AUTO, CMO-AUTO, CPO-AUTO, CCO-AUTO, CHIEF-STAFF, CLARITY-COACH, CLO-AUTO.
 - **Foundational**: AgentFactory, FoundationBuilder, NOVA-CORE, NovaHistorian.
@@ -15,7 +15,7 @@ Coordinated via Redis. Infrastructure: Shopify hub, Lemon Squeezy payments, Prin
 - **New**: SENTIMENT-ANALYZER (X real-time), CYBER-SEC-AUTO, DEVOPS-ENGINEER, MOAT-BUILDER, ETHICS-GUARDIAN, COMMUNITY-MANAGER, PRICING-OPTIMIZER, AI-DOCUMENTOR, FUNDING-STRATEGIST.
 
 ## Infrastructure and Dashboard
-Shopify, Lemon Squeezy, Printed Mint, Render. Dashboard: Tabs (Phases, Industries, agent status, stream pipeline, logs), buttons, Altair/Plotly charts.
+Hybrid: Shopify/Printed Mint for PoD, WooCommerce on Vercel for e-com, Stripe for payments, Printful for PoD, Supabase for DB/realtime, Alchemy for tokenized. Dashboard: Tabs (Phases, Industries, agent status, stream pipeline, logs), buttons, Altair/Plotly charts.
 
 ## Data-Driven Insights
 Sources: Web, X (min_faves:50), Reddit/Forbes. Trends: AI agents, RWAs (00B), healthcare AI (73B). Pains: Grief (90%), R&D (80%), monetization, disputes, education, energy, healthcare.
@@ -35,10 +35,10 @@ Sources: Web, X (min_faves:50), Reddit/Forbes. Trends: AI agents, RWAs (00B), he
 | Hybrid DeFi Subscription Tokenizer | SaaS/Tokenized | Tradable tokens; static models. | 2-3 days | k-k (00k/mo) | Tech: StreamBuilder. Agents: CFO-AUTO, SENTIMENT-ANALYZER, PRICING-OPTIMIZER, FUNDING-STRATEGIST. Costs: 50. Risks: Volatility—trends. | Proposed |
 
 ## Enhanced Roadmap
-- July 26-27: Deploy new agents, validate/launch top 3 (k/mo).
-- July 28-29: Launch 3 more, flywheel/tiers (5k/mo).
-- July 30-31: Add 2, new idea (0k/mo).
-- Aug 1-4: Final 2, moats (5k/mo).
+- July 27-28: Deploy new agents, validate/launch top 3 (k/mo).
+- July 29-30: Launch 3 more, flywheel/tiers (5k/mo).
+- July 31-Aug 1: Add 2, new idea (0k/mo).
+- Aug 2-4: Final 2, moats (5k/mo).
 - Ongoing: 20+ quarterly replications, audits, scale to billions.
 
 ## Risk Mitigation and Success Factors
