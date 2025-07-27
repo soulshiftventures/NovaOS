@@ -212,4 +212,4 @@ threading.Thread(target=time_sentinel_thread).start()
 
 # Keep main process alive
 while True:
-    time.sleep(1)
+    time.sleep(60)
