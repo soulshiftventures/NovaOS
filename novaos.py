@@ -15,12 +15,25 @@ LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 
-r = redis.from_url(REDIS_URL)
-try:
-    r.ping()
-    print("Redis Connected Successfully", flush=True)
-except Exception as e:
-    print(f"Redis Connection Error: {e}", flush=True)
+# Mock Redis for local testing
+class MockRedis:
+    def lrange(self, key, start, end):
+        return [b'CEO-VISION: Blueprint built', b'FoundationBuilder: Architecture set', b'DashboardAgent: Dashboard ready', b'Optimization Cycle']
+    def set(self, key, value):
+        pass
+    def publish(self, channel, message):
+        pass
+
+# Use mock if local, real if Render
+if os.getenv('RENDER') is None:
+    r = MockRedis()
+else:
+    r = redis.from_url(REDIS_URL)
+    try:
+        r.ping()
+        print("Redis Connected Successfully", flush=True)
+    except Exception as e:
+        print(f"Redis Connection Error: {e}", flush=True)
 
 print("NovaOS Started - Activating Corporate Structure", flush=True)
 
@@ -82,8 +95,7 @@ st.dataframe(df_agents, use_container_width=True, column_config={
 })
 
 # Income Stream Pipeline
-st.header('Income Stream Pipeline')
-st.write("Placeholder for monitoring isolated streams (each in Docker containers).")
+st.header('Income Stream Pipeline (Placeholder for monitoring isolated streams (each in Docker containers).")
 pipeline_data = pd.DataFrame([
     {'Stream': 'Stream 1', 'Status': 'Planning', 'Revenue': 0, 'Container': 'docker-stream1'},
     {'Stream': 'Stream 2', 'Status': 'Testing', 'Revenue': 0, 'Container': 'docker-stream2'}
