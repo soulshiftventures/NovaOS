@@ -20,16 +20,11 @@ class MockRedis:
     def lrange(self, key, start, end):
         return [b'CEO-VISION: Blueprint built', b'FoundationBuilder: Architecture set', b'DashboardAgent: Dashboard ready', b'Optimization Cycle']
     def set(self, key, value):
-        pass
+        self.approval = value
+    def get(self, key):
+        return self.approval
     def publish(self, channel, message):
         pass
-    def pubsub(self, ignore_subscribe_messages=True):
-        class MockPubSub:
-            def subscribe(self, channel):
-                pass
-            def get_message(self):
-                return None
-        return MockPubSub()
 
 # Use mock if local, real if Render
 if os.getenv('RENDER') is None:
@@ -119,17 +114,21 @@ with st.expander("View Logs"):
 
 # Approve Actions
 st.header('Approve Actions')
-col1, col2 = st.columns(2)
-with col1:
-    if st.button('Approve', key="approve"):
-        r.set('novaos:approval', 'approve')
-        print("Approved via dashboard", flush=True)
-        st.success("Approved structure")
-with col2:
-    if st.button('Reject', key="reject"):
-        r.set('novaos:approval', 'reject')
-        print("Rejected via dashboard", flush=True)
-        st.error("Rejected structure")
+approval = r.get('novaos:approval')
+if approval and approval.decode() == 'approve':
+    st.success("Structure Approved - Ready for Analytics")
+else:
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button('Approve', key="approve"):
+            r.set('novaos:approval', 'approve')
+            print("Approved via dashboard", flush=True)
+            st.success("Approved structure")
+    with col2:
+        if st.button('Reject', key="reject"):
+            r.set('novaos:approval', 'reject')
+            print("Rejected via dashboard", flush=True)
+            st.error("Rejected structure")
 
 # System Overview Chart
 st.header('System Overview')
