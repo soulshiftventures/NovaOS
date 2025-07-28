@@ -53,47 +53,6 @@ for group in ALL_GROUPS:
 
 st.set_page_config(page_title="NovaOS Central Hub", page_icon="🚀", layout="wide")
 
-# Modern CSS for dark theme/professional look
-st.markdown("""
-<style>
-    .stApp {
-        background-color: #121212;
-        color: #ffffff;
-    }
-    .stButton > button {
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 10px 24px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        font-size: 16px;
-        margin: 4px 2px;
-        cursor: pointer;
-    }
-    .stButton > button:hover {
-        background-color: #45a049;
-    }
-    .stDataFrame {
-        background-color: #1e1e1e;
-        color: #ffffff;
-    }
-    .stHeader {
-        color: #ffffff;
-    }
-    .stExpander {
-        background-color: #1e1e1e;
-        color: #ffffff;
-    }
-    .stTab {
-        background-color: #1e1e1e;
-        color: #ffffff;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 st.title('NovaOS Central Hub')
 
 # Tabs for Fuselab-inspired phases
@@ -139,28 +98,6 @@ st.dataframe(df_agents, use_container_width=True, column_config={
 st.header('Income Stream Pipeline')
 st.write("Placeholder for monitoring isolated streams (each in Docker containers).")
 pipeline_data = pd.DataFrame([
-    {'Stream': agent, 'Group': group_name, 'Status': 'Active'}
-    for group_name, agents in [
-        ('C-Suite', C_SUITE),
-        ('Foundational', FOUNDATIONAL),
-        ('Analytics', ANALYTICS),
-        ('Builders', BUILDERS),
-        ('Tools', TOOLS),
-        ('Specialized', SPECIALIZED)
-    ]
-    for agent in agents
-]
-df_agents = pd.DataFrame(agents_data)
-st.dataframe(df_agents, use_container_width=True, column_config={
-    "Agent": st.column_config.TextColumn("Agent"),
-    "Group": st.column_config.TextColumn("Group"),
-    "Status": st.column_config.TextColumn("Status")
-})
-
-# Income Stream Pipeline
-st.header('Income Stream Pipeline')
-st.write("Placeholder for monitoring isolated streams (each in Docker containers).")
-pipeline_data = pd.DataFrame([
     {'Stream': 'Stream 1', 'Status': 'Planning', 'Revenue': 0, 'Container': 'docker-stream1'},
     {'Stream': 'Stream 2', 'Status': 'Testing', 'Revenue': 0, 'Container': 'docker-stream2'}
 ])
@@ -175,44 +112,20 @@ with st.expander("View Logs"):
 
 # Approve Actions
 st.header('Approve Actions')
-approval = r.get('novaos:approval')
-if approval and approval.decode() == 'approve':
-    st.success("Structure Approved - Ready for Analytics")
-else:
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button('Approve', key="approve"):
-            r.set('novaos:approval', 'approve')
-            print("Approved via dashboard", flush=True)
-            st.success("Approved structure")
-    with col2:
-        if st.button('Reject', key="reject"):
-            r.set('novaos:approval', 'reject')
-            print("Rejected via dashboard", flush=True)
-            st.error("Rejected structure")
-
-# Grok Chat Interface
-st.header('Grok Chat Interface')
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-if prompt := st.chat_input("Ask about streams, ideas, or changes"):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # Simulate Grok response (real-time info via tools in future)
-    response = f"Echo: {prompt} (Grok: Analyzing with X/web search for real-time advice on {prompt})."
-    st.session_state.messages.append({"role": "assistant", "content": response})
-    with st.chat_message("assistant"):
-        st.markdown(response)
+col1, col2 = st.columns(2)
+with col1:
+    if st.button('Approve', key="approve"):
+        r.set('novaos:approval', 'approve')
+        print("Approved via dashboard", flush=True)
+        st.success("Approved structure")
+with col2:
+    if st.button('Reject', key="reject"):
+        r.set('novaos:approval', 'reject')
+        print("Rejected via dashboard", flush=True)
+        st.error("Rejected structure")
 
 # System Overview Chart
-st.header('System Overview')
+st.header('System Overview (Altair bar chart for agent groups)')
 group_data = pd.DataFrame({
     'Group': ['C-Suite', 'Foundational', 'Analytics', 'Builders', 'Tools', 'Specialized'],
     'Count': [len(C_SUITE), len(FOUNDATIONAL), len(ANALYTICS), len(BUILDERS), len(TOOLS), len(SPECIALIZED)]
