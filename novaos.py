@@ -17,6 +17,9 @@ REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 
 # Mock Redis for local testing
 class MockRedis:
+    def __init__(self):
+        self.approval = None
+
     def lrange(self, key, start, end):
         return [b'CEO-VISION: Blueprint built', b'FoundationBuilder: Architecture set', b'DashboardAgent: Dashboard ready', b'Optimization Cycle']
     def set(self, key, value):
