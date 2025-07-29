@@ -53,6 +53,44 @@ for group in ALL_GROUPS:
 
 st.set_page_config(page_title="NovaOS Central Hub", page_icon="🚀", layout="wide")
 
+# Fuselab-inspired CSS for modern look
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #0e1117;
+        color: #ffffff;
+    }
+    .stButton > button {
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 8px;
+        padding: 10px 24px;
+        font-size: 16px;
+    }
+    .stButton > button:hover {
+        background-color: #45a049;
+    }
+    .stDataFrame {
+        background-color: #1f1f1f;
+        color: #ffffff;
+    }
+    .stHeader {
+        color: #ffffff;
+    }
+    .stExpander {
+        background-color: #1f1f1f;
+        color: #ffffff;
+    }
+    .stTab {
+        background-color: #1f1f1f;
+        color: #ffffff;
+    }
+    [data-testid="stSidebar"] {
+        background-color: #0e1117;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.title('NovaOS Central Hub')
 
 # Tabs for Fuselab-inspired phases
@@ -112,20 +150,24 @@ with st.expander("View Logs"):
 
 # Approve Actions
 st.header('Approve Actions')
-col1, col2 = st.columns(2)
-with col1:
-    if st.button('Approve', key="approve"):
-        r.set('novaos:approval', 'approve')
-        print("Approved via dashboard", flush=True)
-        st.success("Approved structure")
-with col2:
-    if st.button('Reject', key="reject"):
-        r.set('novaos:approval', 'reject')
-        print("Rejected via dashboard", flush=True)
-        st.error("Rejected structure")
+approval = r.get('novaos:approval')
+if approval and approval.decode() == 'approve':
+    st.success("Structure Approved - Ready for Analytics")
+else:
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button('Approve', key="approve"):
+            r.set('novaos:approval', 'approve')
+            print("Approved via dashboard", flush=True)
+            st.success("Approved structure")
+    with col2:
+        if st.button('Reject', key="reject"):
+            r.set('novaos:approval', 'reject')
+            print("Rejected via dashboard", flush=True)
+            st.error("Rejected structure")
 
 # System Overview Chart
-st.header('System Overview (Altair bar chart for agent groups)')
+st.header('System Overview')
 group_data = pd.DataFrame({
     'Group': ['C-Suite', 'Foundational', 'Analytics', 'Builders', 'Tools', 'Specialized'],
     'Count': [len(C_SUITE), len(FOUNDATIONAL), len(ANALYTICS), len(BUILDERS), len(TOOLS), len(SPECIALIZED)]
