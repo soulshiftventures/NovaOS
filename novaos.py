@@ -64,62 +64,7 @@ for group in ALL_GROUPS:
 
 st.set_page_config(page_title="NovaOS Central Hub", page_icon="🚀", layout="wide")
 
-# Fuselab-inspired CSS for modern look
-st.markdown("""
-<style>
-    .stApp {
-        background-color: #0e1117;
-        color: #ffffff;
-        font-family: 'Inter', sans-serif;
-    }
-    .stButton > button {
-        background-color: #4CAF50;
-        color: white;
-        border-radius: 8px;
-        padding: 10px 24px;
-        font-size: 16px;
-        transition: background-color 0.3s;
-    }
-    .stButton > button:hover {
-        background-color: #45a049;
-    }
-    .stDataFrame {
-        background-color: #1f1f1f;
-        color: #ffffff;
-        border-radius: 8px;
-    }
-    .stHeader {
-        color: #ffffff;
-        font-size: 24px;
-        font-weight: bold;
-    }
-    .stExpander {
-        background-color: #1f1f1f;
-        color: #ffffff;
-        border-radius: 8px;
-    }
-    .stTab {
-        background-color: #1f1f1f;
-        color: #ffffff;
-        border-radius: 8px 8px 0 0;
-    }
-    [data-testid="stSidebar"] {
-        background-color: #0e1117;
-    }
-    .css-1v3fvcr {
-        background-color: #1f1f1f;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 st.title('NovaOS Central Hub')
-
-# Sidebar for navigation
-with st.sidebar:
-    st.header("Navigation")
-    st.button("Dashboard", key="nav_dashboard")
-    st.button("Stream Management", key="nav_streams")
-    st.button("Analytics", key="nav_analytics")
 
 # Tabs for Fuselab-inspired phases
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(['Discovery', 'AI UX Research', 'Planning', 'Creation', 'Testing', 'Finalizing', 'All Industries'])
@@ -193,25 +138,6 @@ else:
             r.set('novaos:approval', 'reject')
             print("Rejected via dashboard", flush=True)
             st.error("Rejected structure")
-
-# Grok Chat Interface
-st.header('Grok Chat Interface')
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-if prompt := st.chat_input("Ask about streams, ideas, or changes"):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    # Simulate Grok response (real-time info via tools in future)
-    response = f"Echo: {prompt} (Grok: Analyzing with X/web search for real-time advice on {prompt})."
-    st.session_state.messages.append({"role": "assistant", "content": response})
-    with st.chat_message("assistant"):
-        st.markdown(response)
 
 # System Overview Chart
 st.header('System Overview')
