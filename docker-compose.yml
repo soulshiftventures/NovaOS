@@ -72,3 +72,10 @@ services:
       - ./data:/home/node/.n8n
 
 
+
+  langgraph-router:
+    image: ghcr.io/langchain-ai/langgraph-router:latest
+    ports:
+      - "8001:80"
+    environment:
+      - LANGGRAPH_API_KEY=${LANGGRAPH_API_KEY}

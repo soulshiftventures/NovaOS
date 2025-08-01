@@ -13,3 +13,7 @@ RUN pip install --upgrade pip \
 
 CMD ["python", "nova.py"]
 
+
+# NovaOS entrypoint
+COPY main.py /app/main.py
+ENTRYPOINT ["python", "/app/main.py"]
