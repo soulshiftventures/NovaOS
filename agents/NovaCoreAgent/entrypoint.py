@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import time, threading, sys
+import time, threading
 from agents._lib import telemetry
 
 NAME = "NovaCoreAgent"
@@ -13,7 +13,7 @@ def _hb():
         time.sleep(30)
 
 def main():
-    print("🧠 [NovaCoreAgent] booting...", flush=True)
+    print("🧠 [NovaCoreAgent] booting v1", flush=True)
     try:
         telemetry.lifecycle(agent=NAME, status="started")
         print("🧠 [NovaCoreAgent] lifecycle emitted", flush=True)
@@ -26,4 +26,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
