@@ -14,7 +14,6 @@ def mem_write(payload: dict):
 def main():
     mem_write({"agent": AGENT_NAME, "type": "event", "topic": "lifecycle",
                "payload": {"status": "starting"}, "ts": time.time()})
-
     proc = subprocess.Popen(
         ["python3", "main.py"],
         stdout=subprocess.PIPE,
@@ -27,7 +26,6 @@ def main():
         sys.stdout.write(line + "\n")
         mem_write({"agent": AGENT_NAME, "type": "log", "topic": "stdout",
                    "payload": {"line": line}, "ts": time.time()})
-
     code = proc.wait()
     mem_write({"agent": AGENT_NAME, "type": "event", "topic": "lifecycle",
                "payload": {"status": "exited", "code": code}, "ts": time.time()})

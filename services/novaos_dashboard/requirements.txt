@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+supervisor
+redis
+requests
+python-dotenv
