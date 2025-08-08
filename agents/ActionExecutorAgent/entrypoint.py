@@ -7,7 +7,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 os.chdir(AGENT_DIR)
 
-MCP_MEMORY_URL = os.getenv("MCP_MEMORY_URL")
+MCP_MEMORY_URL = os.getenv("MCP_MEMORY_URL", "https://novaosmem.onrender.com")
 def mem_write(p):
     if not MCP_MEMORY_URL: return
     try: requests.post(MCP_MEMORY_URL.rstrip('/') + "/tools/memory.write", json={"data": p}, timeout=5)
