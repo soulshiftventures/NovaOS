@@ -1,28 +1,20 @@
 #!/usr/bin/env python3
-import time
-import threading
+import time, threading
 from agents._lib import telemetry
 
 NAME = "ActionExecutorAgent"
 
-def _heartbeat_loop():
+def _hb():
     while True:
-        try:
-            telemetry.heartbeat(agent=NAME)
-        except Exception as e:
-            print(f"[{NAME}] heartbeat error: {e}")
+        try: telemetry.heartbeat(agent=NAME)
+        except Exception as e: print(f"[{NAME}] heartbeat error: {e}")
         time.sleep(30)
 
 def main():
     telemetry.lifecycle(agent=NAME, status="started")
     print("🛠️ [ActionExecutorAgent] Standing by.")
-
-    th = threading.Thread(target=_heartbeat_loop, daemon=True)
-    th.start()
-
-    # TODO: watch for actions and execute them
-    while True:
-        time.sleep(60)
+    threading.Thread(target=_hb, daemon=True).start()
+    while True: time.sleep(60)
 
 if __name__ == "__main__":
     main()
