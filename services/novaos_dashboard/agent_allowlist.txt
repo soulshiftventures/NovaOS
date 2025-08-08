@@ -1,3 +1,5 @@
 PerplexityFetcherAgent
 NovaCoreAgent
 ActionExecutorAgent
+NovaHistorian
+
