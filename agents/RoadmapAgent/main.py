@@ -1,22 +1,26 @@
-import os
-import json
-import redis
-from dotenv import load_dotenv
+#!/usr/bin/env python3
+import os, time, signal
 
-load_dotenv()
+# uses the shared telemetry helper your other agents use
+from agents._lib import telemetry
 
-r = redis.Redis(host='red-d1u794c9c44c73cmjbf0', port=6379, db=0)
-pubsub = r.pubsub()
-pubsub.subscribe('novaos:commands')
+NAME = "RoadmapAgent"
+running = True
 
-for message in pubsub.listen():
-    if message['type'] == 'message':
-        try:
-            cmd = json.loads(message['data'].decode('utf-8'))
-            if cmd.get('agent') == 'RoadmapAgent':
-                payload = cmd['payload']
-                if payload.get('action') == 'create_roadmap':
-                    roadmap = "Created roadmap: Trend research, low-cost plan ($0-100 startup), setup (free tools/social), launch, scale to $10k+/mo with profits, monitor for $25k total by Aug 4th."
-                    r.publish('novaos:logs', json.dumps({'event': 'Roadmap Created', 'details': roadmap}))
-        except Exception as e:
-            r.publish('novaos:logs', json.dumps({'event': 'RoadmapAgent Error', 'details': str(e)}))
+def _stop(*_):
+    global running
+    running = False
+
+signal.signal(signal.SIGTERM, _stop)
+
+# lifecycle: started
+telemetry.emit(agent=NAME, type="event", topic="lifecycle", payload={"status": "started"})
+
+# simple keepalive loop; extend with real work later
+while running:
+    telemetry.emit(agent=NAME, type="event", topic="heartbeat", payload={"alive": True})
+    time.sleep(60)
+
+# lifecycle: stopped
+telemetry.emit(agent=NAME, type="event", topic="lifecycle", payload={"status": "stopped"})
+
