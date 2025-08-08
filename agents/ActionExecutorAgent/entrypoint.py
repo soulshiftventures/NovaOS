@@ -1,3 +1,4 @@
+from agents._lib import telemetry
 import os, sys, time, runpy, requests
 from pathlib import Path
 AGENT_NAME = "ActionExecutorAgent"
