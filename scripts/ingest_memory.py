@@ -1,6 +1,6 @@
-import os, subprocess, sys, json, requests, pathlib
+import os, subprocess, sys, pathlib, psycopg, json
 
-MEMORY_API_URL = os.environ["MEMORY_API_URL"]
+DB = os.environ["DATABASE_URL"]  # supplied by GitHub Action env
 BASE = os.environ.get("BASE_SHA", "")
 HEAD = os.environ.get("HEAD_SHA", "")
 
@@ -25,32 +25,32 @@ def chunks(text, size=3000, overlap=300):
         i += 1
         start = end - overlap if end - overlap > start else end
 
-def upsert(doc_id, chunk_id, content):
-    payload = {
-        "source":"github",
-        "doc_id":doc_id,
-        "chunk_id":f"{doc_id}:{chunk_id}",
-        "content":content,
-        "metadata":{"path":doc_id}
-    }
-    r = requests.post(f"{MEMORY_API_URL}/upsert", json=payload, timeout=60)
-    r.raise_for_status()
+def upsert(conn, doc_id, chunk_id, content):
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO memory_chunks (source, doc_id, chunk_id, content, metadata)
+            VALUES (%s, %s, %s, %s, %s::jsonb)
+            ON CONFLICT (source, doc_id, chunk_id) DO UPDATE
+              SET content = EXCLUDED.content,
+                  metadata = EXCLUDED.metadata;
+        """, ("github", doc_id, f"{doc_id}:{chunk_id}", content, json.dumps({"path": doc_id})))
 
 def main():
     paths = changed_paths()
     total_chunks = 0
-    for p in paths:
-        try:
-            text = pathlib.Path(p).read_text(encoding="utf-8", errors="ignore")
-        except Exception:
-            continue
-        for i, chunk in chunks(text):
-            upsert(p, i, chunk)
-            total_chunks += 1
+    with psycopg.connect(DB) as conn:
+        for p in paths:
+            try:
+                text = pathlib.Path(p).read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+            for i, chunk in chunks(text):
+                upsert(conn, p, i, chunk)
+                total_chunks += 1
     print(f"ingested_files={len(paths)} total_chunks={total_chunks}")
 
 if __name__ == "__main__":
-    if not MEMORY_API_URL:
-        print("MEMORY_API_URL env missing", file=sys.stderr)
+    if not DB:
+        print("DATABASE_URL missing", file=sys.stderr)
         sys.exit(1)
     main()
