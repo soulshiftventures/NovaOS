@@ -38,7 +38,16 @@ jobs:
           shopt -s dotglob
           mv "src/$REPO_DIR"/* workspace/
           rm -rf src src.zip
+          ls -la workspace/agents/_lib | sed -n '1,200p' || true
+          ls -la workspace/scripts | sed -n '1,200p' || true
+
+      - name: Check required files
+        run: |
+          test -f workspace/agents/_lib/context_pg.py || (echo "MISSING: agents/_lib/context_pg.py"; exit 11)
+          test -f workspace/scripts/memory_search.py || (echo "MISSING: scripts/memory_search.py"; exit 12)
 
       - name: Run smoke
         working-directory: workspace
+        env:
+          PYTHONPATH: ${{ github.workspace }}/workspace
         run: python -u scripts/memory_search.py
