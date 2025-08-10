@@ -1,0 +1,28 @@
+name: Ingest repo docs into Memory
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL_GHA }}
+      BASE_SHA: ${{ github.event.before }}
+      HEAD_SHA: ${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install "psycopg[binary]>=3.1"
+
+      - name: Ingest changed files
+        run: python scripts/ingest_memory.py
