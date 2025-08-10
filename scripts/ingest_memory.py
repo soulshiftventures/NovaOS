@@ -1,6 +1,9 @@
 import os, json, psycopg
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
+def clean_url(u: str) -> str:
+    return (u or "").strip().replace("\n","").replace("\r","")
+
 def add_sslmode(url: str) -> str:
     parsed = urlparse(url)
     q = parse_qs(parsed.query)
@@ -15,9 +18,7 @@ def table_exists(conn, table_name: str) -> bool:
         return bool(cur.fetchone()[0])
 
 def chunk_text(text: str, chunk_size: int = 3000, overlap: int = 300):
-    chunks = []
-    start = 0
-    n = len(text)
+    chunks, start, n = [], 0, len(text)
     while start < n:
         end = min(n, start + chunk_size)
         chunks.append(text[start:end])
@@ -45,7 +46,7 @@ def should_include(rel_dir: str, filename: str) -> bool:
     return rel_dir.startswith("docs") or rel_dir.startswith("brain")
 
 def main():
-    db_url = os.environ.get("DATABASE_URL", "")
+    db_url = clean_url(os.environ.get("DATABASE_URL", ""))
     if not db_url:
         print("DATABASE_URL missing", flush=True)
         raise SystemExit(1)
