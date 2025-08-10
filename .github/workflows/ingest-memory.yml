@@ -15,18 +15,11 @@ jobs:
     timeout-minutes: 5
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL_GHA }}
-      BASE_SHA: ${{ github.event.before }}
-      HEAD_SHA: ${{ github.sha }}
     steps:
-      - name: Checkout (full history)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Show SHAs
-        run: |
-          echo "BASE_SHA=$BASE_SHA"
-          echo "HEAD_SHA=$HEAD_SHA"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,9 +29,5 @@ jobs:
       - name: Install deps
         run: pip install --quiet "psycopg[binary]>=3.1"
 
-      - name: List candidate files
-        run: |
-          git ls-files | grep -E '^(docs/|brain/)|(\.md$)|^(NOVA_PROTOCOL\.md|SESSION_BOOTSTRAP\.md|TASKS_CURRENT\.md)$' || true
-
-      - name: Ingest changed files
+      - name: Ingest docs (no git ops)
         run: python scripts/ingest_memory.py
