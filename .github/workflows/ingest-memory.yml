@@ -1,5 +1,4 @@
-name: Ingest repo docs into Memory
-
+name: Ingest Memory
 on:
   push:
     branches: [ "main" ]
@@ -16,18 +15,16 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL_GHA }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set up Python
+      - name: Set safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Install deps
-        run: pip install --quiet "psycopg[binary]>=3.1"
-
-      - name: Ingest docs (no git ops)
+      - name: Install dependencies
+        run: pip install "psycopg[binary]>=3.1"
+      - name: Run ingest script
         run: python scripts/ingest_memory.py
