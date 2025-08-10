@@ -25,35 +25,33 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y curl unzip
 
+      - name: Install Python deps (psycopg)
+        run: python -m pip install --quiet "psycopg[binary]>=3.1"
+
       - name: Download repo as zip (no git)
         run: |
           set -e
-          echo "Downloading zip for ${{ github.repository }} @ ${{ github.sha }}"
           curl -sS -H "Authorization: token ${{ github.token }}" \
                -L "https://api.github.com/repos/${{ github.repository }}/zipball/${{ github.sha }}" \
                -o src.zip
           unzip -q src.zip -d src
           REPO_DIR="$(ls -1 src)"
-          echo "Unzipped folder: $REPO_DIR"
-          shopt -s dotglob
           mkdir -p workspace
+          shopt -s dotglob
           mv "src/$REPO_DIR"/* workspace/
-          mv "src/$REPO_DIR"/.* workspace/ || true
           rm -rf src src.zip
           ls -la workspace | sed -n '1,200p'
 
       - name: Check ingest script exists
         run: |
-          set -e
           test -f workspace/scripts/ingest_memory.py || (echo "ERROR: workspace/scripts/ingest_memory.py not found"; find workspace -maxdepth 3 -type f | sort | sed -n '1,200p'; exit 7)
 
-      - name: DB preflight
+      - name: DB preflight (uses psycopg)
         run: |
           python - <<'PY'
           import os, psycopg
           db=os.environ["DATABASE_URL"]
           if "sslmode=" not in db: db+=("?sslmode=require" if "?" not in db else "&sslmode=require")
-          print("DB host:", db.split("@")[1].split("/")[0])
           with psycopg.connect(db) as c, c.cursor() as cur:
               cur.execute("SELECT 1;")
               cur.execute("SELECT to_regclass('public.memory_chunks');")
@@ -61,12 +59,6 @@ jobs:
           print("DB OK")
           PY
 
-      - name: Install Python deps
-        working-directory: workspace
-        run: pip install --quiet "psycopg[binary]>=3.1"
-
       - name: Ingest
         working-directory: workspace
-        run: |
-          set -e
-          python -u scripts/ingest_memory.py || (echo "INGEST_FAILED"; exit 9)
+        run: python -u scripts/ingest_memory.py
