@@ -17,18 +17,14 @@ jobs:
       - name: Install psycopg
         run: python -m pip install --quiet "psycopg[binary]>=3.1"
 
-      - name: Create FTS index + vacuum
+      - name: Create FTS index + vacuum (autocommit)
         run: |
           python - <<'PY'
           import os, psycopg
           db=os.environ['DATABASE_URL'].strip().replace('\n','').replace('\r','')
           if 'sslmode=' not in db: db+=('?sslmode=require' if '?' not in db else '&sslmode=require')
-          sql = """
-          CREATE INDEX IF NOT EXISTS memory_chunks_fts_idx
-          ON memory_chunks USING GIN (to_tsvector('english', content));
-          VACUUM ANALYZE memory_chunks;
-          """
-          with psycopg.connect(db) as c, c.cursor() as cur:
-              cur.execute(sql)
+          with psycopg.connect(db, autocommit=True) as c, c.cursor() as cur:
+              cur.execute("CREATE INDEX IF NOT EXISTS memory_chunks_fts_idx ON memory_chunks USING GIN (to_tsvector('english', content));")
+              cur.execute("VACUUM ANALYZE memory_chunks;")
           print("INDEX_OK")
           PY
