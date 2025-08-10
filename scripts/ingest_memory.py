@@ -1,29 +1,42 @@
-import os, subprocess, sys, pathlib, json
+import os, sys, pathlib, json
 
 # --- DB URL with TLS fallback ---
 DB = os.environ.get("DATABASE_URL", "")
 if DB and "sslmode=" not in DB:
     DB = f"{DB}{'&' if '?' in DB else '?'}sslmode=require"
 
-BASE = os.environ.get("BASE_SHA", "")
-HEAD = os.environ.get("HEAD_SHA", "")
+# Which files to ingest (no git calls)
+INCLUDE_FILES = {
+    "NOVA_PROTOCOL.md",
+    "SESSION_BOOTSTRAP.md",
+    "TASKS_CURRENT.md",
+}
+INCLUDE_DIR_PREFIXES = ("docs/", "brain/")
+INCLUDE_EXTS = (".md",)
 
-def run_lines(cmd):
-    return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode().splitlines()
-
-def changed_paths():
-    # Try diff between BASE..HEAD, else fall back to all files
-    try:
-        if BASE and HEAD and BASE != "0000000000000000000000000000000000000000":
-            # Ensure SHAs exist in shallow clones
-            subprocess.run(["git", "fetch", "--prune", "--unshallow"], check=False)
-            return run_lines(["git", "diff", "--name-only", f"{BASE}..{HEAD}"])
-    except Exception:
-        pass
-    try:
-        return run_lines(["git", "ls-files"])
-    except Exception:
-        return []
+def collect_paths(repo_root="."):
+    root = pathlib.Path(repo_root)
+    skip_dirs = {".git", ".github", ".venv", "venv", "node_modules", "__pycache__"}
+    out = []
+    for p in root.rglob("*"):
+        if p.is_dir():
+            # skip heavy/hidden dirs early
+            if p.name in skip_dirs:
+                # don't descend
+                dirs = []
+            continue
+        rel = p.relative_to(root).as_posix()
+        # skip files inside skipped dirs (already handled), else include rules:
+        if rel in INCLUDE_FILES:
+            out.append(rel)
+            continue
+        if rel.endswith(INCLUDE_EXTS):
+            out.append(rel)
+            continue
+        if rel.startswith(INCLUDE_DIR_PREFIXES):
+            out.append(rel)
+            continue
+    return out
 
 def chunks(text, size=3000, overlap=300):
     i = 0
@@ -50,9 +63,9 @@ def main():
         print("DATABASE_URL missing", file=sys.stderr)
         sys.exit(1)
 
-    import psycopg
-    # Preflight: connect + table check
+    # Preflight DB connect + table existence
     try:
+        import psycopg
         with psycopg.connect(DB) as c, c.cursor() as cur:
             cur.execute("SELECT to_regclass('public.memory_chunks');")
             if not cur.fetchone()[0]:
@@ -62,20 +75,18 @@ def main():
         print(f"ERROR: DB connect/query failed: {e}", file=sys.stderr)
         sys.exit(3)
 
-    paths = changed_paths()
+    paths = collect_paths(".")
     total_chunks = 0
     with psycopg.connect(DB) as conn:
-        for p in paths:
-            if not (p.startswith("docs/") or p.startswith("brain/") or p.endswith(".md") or p in ("NOVA_PROTOCOL.md","SESSION_BOOTSTRAP.md","TASKS_CURRENT.md")):
-                continue
+        for rel in paths:
             try:
-                text = pathlib.Path(p).read_text(encoding="utf-8", errors="ignore")
+                text = pathlib.Path(rel).read_text(encoding="utf-8", errors="ignore")
             except Exception:
                 continue
             for i, chunk in chunks(text):
-                upsert(conn, p, i, chunk)
+                upsert(conn, rel, i, chunk)
                 total_chunks += 1
-    print(f"ingested_files={len([p for p in paths if p])} total_chunks={total_chunks}")
+    print(f"ingested_files={len(paths)} total_chunks={total_chunks}")
 
 if __name__ == "__main__":
     main()
