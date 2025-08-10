@@ -51,6 +51,7 @@ def main():
         raise SystemExit(1)
     db_url = add_sslmode(db_url)
 
+    # Connect + preflight
     try:
         with psycopg.connect(db_url) as conn:
             if not table_exists(conn, "memory_chunks"):
@@ -88,4 +89,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
