@@ -39,11 +39,9 @@ def upsert_chunk(conn, rel_path: str, idx: int, chunk: str):
         )
 
 def should_include(rel_dir: str, filename: str) -> bool:
-    # Include root *.md and specific files
     include_files = {"NOVA_PROTOCOL.md", "SESSION_BOOTSTRAP.md", "TASKS_CURRENT.md"}
     if rel_dir == ".":
         return filename.endswith(".md") or filename in include_files
-    # Include anything under docs/ or brain/
     return rel_dir.startswith("docs") or rel_dir.startswith("brain")
 
 def main():
@@ -53,9 +51,8 @@ def main():
         raise SystemExit(1)
     db_url = add_sslmode(db_url)
 
-    # Connect + preflight
     try:
-        with psycopg.connect(db_url) as conn, conn.cursor() as cur:
+        with psycopg.connect(db_url) as conn:
             if not table_exists(conn, "memory_chunks"):
                 print("ERROR: table memory_chunks does not exist", flush=True)
                 raise SystemExit(2)
@@ -91,3 +88,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
