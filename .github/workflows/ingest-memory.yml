@@ -46,11 +46,11 @@ jobs:
         run: |
           test -f workspace/scripts/ingest_memory.py || (echo "ERROR: workspace/scripts/ingest_memory.py not found"; find workspace -maxdepth 3 -type f | sort | sed -n '1,200p'; exit 7)
 
-      - name: DB preflight (uses psycopg)
+      - name: DB preflight (strip/normalize URL)
         run: |
           python - <<'PY'
           import os, psycopg
-          db=os.environ["DATABASE_URL"]
+          db=os.environ["DATABASE_URL"].strip().replace("\n","").replace("\r","")
           if "sslmode=" not in db: db+=("?sslmode=require" if "?" not in db else "&sslmode=require")
           with psycopg.connect(db) as c, c.cursor() as cur:
               cur.execute("SELECT 1;")
