@@ -15,16 +15,38 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL_GHA }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Mark workspace safe (pre-checkout)
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+          git config --global --add safe.directory "/github/workspace" || true
+          git config --global --add safe.directory "*" || true
+
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Set safe directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+          ref: ${{ github.sha }}
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Install dependencies
         run: pip install "psycopg[binary]>=3.1"
+
+      - name: DB preflight
+        run: |
+          python - <<'PY'
+          import os, psycopg
+          db=os.environ["DATABASE_URL"]
+          if "sslmode=" not in db: db+=("?sslmode=require" if "?" not in db else "&sslmode=require")
+          with psycopg.connect(db) as c, c.cursor() as cur:
+              cur.execute("SELECT 1;")
+              cur.execute("SELECT to_regclass('public.memory_chunks');")
+              assert cur.fetchone()[0], "table memory_chunks missing"
+          print("DB OK")
+          PY
+
       - name: Run ingest script
         run: python scripts/ingest_memory.py
