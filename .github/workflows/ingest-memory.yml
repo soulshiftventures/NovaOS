@@ -15,18 +15,6 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL_GHA }}
     steps:
-      - name: Mark workspace safe (pre-checkout)
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
-          git config --global --add safe.directory "/github/workspace" || true
-          git config --global --add safe.directory "*" || true
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.sha }}
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -34,6 +22,17 @@ jobs:
 
       - name: Install dependencies
         run: pip install "psycopg[binary]>=3.1"
+
+      - name: Download source zip (no git)
+        run: |
+          curl -sSL -H "Authorization: Bearer ${{ github.token }}" \
+               -H "Accept: application/vnd.github+json" \
+               "https://api.github.com/repos/${{ github.repository }}/zipball/${{ github.sha }}" \
+               -o src.zip
+          unzip -q src.zip -d src
+          REPO_DIR=$(ls -1 src)
+          mv "src/$REPO_DIR"/* .
+          rm -rf src src.zip
 
       - name: DB preflight
         run: |
