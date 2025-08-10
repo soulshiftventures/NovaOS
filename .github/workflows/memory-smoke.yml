@@ -1,0 +1,44 @@
+name: Memory Smoke
+on:
+  workflow_dispatch:
+    inputs:
+      q:
+        description: "Query to search"
+        required: false
+        default: "NovaOS"
+
+concurrency:
+  group: memory-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL_GHA }}
+      QUERY: ${{ github.event.inputs.q }}
+    steps:
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install psycopg
+        run: python -m pip install --quiet "psycopg[binary]>=3.1"
+
+      - name: Download repo as zip (no git)
+        run: |
+          curl -sS -H "Authorization: token ${{ github.token }}" \
+               -L "https://api.github.com/repos/${{ github.repository }}/zipball/${{ github.sha }}" \
+               -o src.zip
+          unzip -q src.zip -d src
+          REPO_DIR="$(ls -1 src)"
+          mkdir -p workspace
+          shopt -s dotglob
+          mv "src/$REPO_DIR"/* workspace/
+          rm -rf src src.zip
+
+      - name: Run smoke
+        working-directory: workspace
+        run: python -u scripts/memory_search.py
