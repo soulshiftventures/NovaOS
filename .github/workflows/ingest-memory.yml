@@ -4,7 +4,7 @@ on:
     branches: [ "main" ]
   workflow_dispatch: {}
   schedule:
-    # 07:15 UTC ≈ 02:15 America/Chicago (handles DST by UTC)
+    # 07:15 UTC ≈ 02:15 America/Chicago (DST-safe via UTC)
     - cron: "15 7 * * *"
 
 concurrency:
@@ -27,8 +27,7 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y curl unzip
-
-      - name: Install Python deps (psycopg)
+      - name: Install psycopg
         run: python -m pip install --quiet "psycopg[binary]>=3.1"
 
       - name: Download repo as zip (no git)
@@ -44,7 +43,7 @@ jobs:
           mv "src/$REPO_DIR"/* workspace/
           rm -rf src src.zip
 
-      - name: DB preflight (strip/normalize URL)
+      - name: DB preflight
         run: |
           python - <<'PY'
           import os, psycopg
@@ -57,6 +56,6 @@ jobs:
           print("DB OK")
           PY
 
-      - name: Ingest
+      - name: Ingest changed files
         working-directory: workspace
         run: python -u scripts/ingest_memory.py
