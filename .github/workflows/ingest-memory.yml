@@ -3,6 +3,9 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch: {}
+  schedule:
+    # 07:15 UTC ≈ 02:15 America/Chicago (handles DST by UTC)
+    - cron: "15 7 * * *"
 
 concurrency:
   group: ingest-memory
@@ -40,11 +43,6 @@ jobs:
           shopt -s dotglob
           mv "src/$REPO_DIR"/* workspace/
           rm -rf src src.zip
-          ls -la workspace | sed -n '1,200p'
-
-      - name: Check ingest script exists
-        run: |
-          test -f workspace/scripts/ingest_memory.py || (echo "ERROR: workspace/scripts/ingest_memory.py not found"; find workspace -maxdepth 3 -type f | sort | sed -n '1,200p'; exit 7)
 
       - name: DB preflight (strip/normalize URL)
         run: |
