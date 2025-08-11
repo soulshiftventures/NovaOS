@@ -1,79 +1,105 @@
-import os, json, psycopg
+import os
+import json
 from typing import List, Dict, Any
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+import psycopg
 
-def _clean_url(u: str) -> str:
-    return (u or "").strip().replace("\n","").replace("\r","")
+# --- DB helpers --------------------------------------------------------------
 
-def _add_sslmode(url: str) -> str:
-    parsed = urlparse(url)
+def _with_sslmode(db_url: str) -> str:
+    parsed = urlparse(db_url.strip())
     q = parse_qs(parsed.query)
-    if 'sslmode' not in q:
-        q['sslmode'] = ['require']
-    new_q = urlencode(q, doseq=True)
-    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_q, parsed.fragment))
+    if "sslmode" not in q:
+        q["sslmode"] = ["require"]
+    return urlunparse((
+        parsed.scheme, parsed.netloc, parsed.path, parsed.params,
+        urlencode(q, doseq=True), parsed.fragment
+    ))
 
 def _conn():
-    db = _add_sslmode(_clean_url(os.environ.get("DATABASE_URL", "")))
-    if not db:
-        raise RuntimeError("DATABASE_URL not set")
-    return psycopg.connect(db)
+    db = os.environ["DATABASE_URL"]
+    return psycopg.connect(_with_sslmode(db))
+
+# --- Public API --------------------------------------------------------------
+
+def learn(doc_id: str, content: str, tags: List[str] | None = None) -> Dict[str, Any]:
+    """
+    Upsert a single-note document into memory_chunks.
+    - source: 'dashboard'
+    - doc_id: your title (stable identifier)
+    - chunk_id: '0' (one chunk per note)
+    """
+    if not doc_id or not content:
+        raise ValueError("doc_id and content are required")
+
+    meta = {"tags": tags or []}
+    with _conn() as c:
+        with c.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO memory_chunks (source, doc_id, chunk_id, content, metadata)
+                VALUES (%s, %s, %s, %s, %s::jsonb)
+                ON CONFLICT (source, doc_id, chunk_id)
+                DO UPDATE SET content = EXCLUDED.content, metadata = EXCLUDED.metadata
+                RETURNING xmax::text; -- '0' on insert, else nonzero on update
+                """,
+                ("dashboard", doc_id, "0", content, json.dumps(meta))
+            )
+            updated = cur.fetchone()[0] != "0"
+    return {"status": "updated" if updated else "ok", "doc_id": doc_id}
 
 def fetch_context(query: str, k: int = 8) -> List[Dict[str, Any]]:
     """
-    Full-text search over memory_chunks. No embeddings required.
-    Returns: [{content, metadata, source, doc_id, chunk_id, score}]
+    Title-aware + content-aware search.
+    - Matches if doc_id equals, doc_id ILIKE, or content full-text matches.
+    - Ranks: exact title >> partial title >> content match.
     """
+    if not query:
+        return []
+
+    q_ilike = f"%{query}%"
+    rows: List[Dict[str, Any]] = []
+
     sql = """
-    SELECT content, metadata, source, doc_id, chunk_id,
-           ts_rank_cd(to_tsvector('english', content),
-                      plainto_tsquery('english', %s)) AS rank
-    FROM memory_chunks
-    WHERE to_tsvector('english', content) @@ plainto_tsquery('english', %s)
-    ORDER BY rank DESC
+    WITH scored AS (
+      SELECT
+        doc_id,
+        chunk_id,
+        content,
+        /* Content rank (0 if no FTS match) */
+        COALESCE(ts_rank_cd(to_tsvector('english', content),
+                            plainto_tsquery('english', %s)), 0) AS content_rank,
+        /* Title boosts */
+        CASE
+          WHEN doc_id = %s THEN 10.0
+          WHEN doc_id ILIKE %s THEN 5.0
+          ELSE 0.0
+        END AS title_boost
+      FROM memory_chunks
+      WHERE
+        doc_id = %s
+        OR doc_id ILIKE %s
+        OR to_tsvector('english', content) @@ plainto_tsquery('english', %s)
+    )
+    SELECT
+      doc_id,
+      chunk_id,
+      content,
+      (content_rank + title_boost) AS score
+    FROM scored
+    ORDER BY score DESC
     LIMIT %s;
     """
-    with _conn() as c, c.cursor() as cur:
-        cur.execute(sql, (query, query, k))
-        rows = cur.fetchall()
-    if rows:
-        return [
-            {"content": ct, "metadata": md, "source": src,
-             "doc_id": did, "chunk_id": cid, "score": float(rk)}
-            for (ct, md, src, did, cid, rk) in rows
-        ]
-    # Fallback: substring search if FTS finds nothing
-    with _conn() as c, c.cursor() as cur:
-        cur.execute("""
-            SELECT content, metadata, source, doc_id, chunk_id, 0.0 AS score
-            FROM memory_chunks
-            WHERE content ILIKE '%%' || %s || '%%'
-            ORDER BY created_at DESC
-            LIMIT %s;
-        """, (query, k))
-        rows = cur.fetchall()
-    return [
-        {"content": ct, "metadata": md, "source": src,
-         "doc_id": did, "chunk_id": cid, "score": 0.0}
-        for (ct, md, src, did, cid, _) in rows
-    ]
 
-def learn(title: str, body: str, tags=None) -> Dict[str, Any]:
-    """
-    Persist an event/summary into memory_chunks.
-    """
-    tags = tags or []
-    doc_id = f"historian/{title.lower().replace(' ', '-')}"
+    params = (query, query, q_ilike, query, q_ilike, query, k)
 
     with _conn() as c, c.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO memory_chunks (source, doc_id, chunk_id, content, metadata)
-            VALUES (%s, %s, %s, %s, %s::jsonb)
-            ON CONFLICT (source, doc_id, chunk_id) DO UPDATE
-              SET content = EXCLUDED.content,
-                  metadata = EXCLUDED.metadata;
-            """,
-            ("historian", doc_id, doc_id, body, json.dumps({"tags": tags})),
-        )
-    return {"status": "ok", "doc_id": doc_id}
+        cur.execute(sql, params)
+        for doc_id, chunk_id, content, score in cur.fetchall():
+            rows.append({
+                "doc_id": doc_id,
+                "chunk_id": chunk_id,
+                "content": content,
+                "score": float(score),
+            })
+    return rows
