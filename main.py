@@ -177,6 +177,29 @@ else:
             })
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
+# --- Add Note to Memory (writes to Postgres) ---
+st.header('Add Note to Memory')
+if not MEMORY_ON:
+    st.info(f"Memory disabled: {_memory_disabled_reason()}. Notes are disabled.")
+else:
+    note_title = st.text_input("Title (becomes doc_id)", value="", placeholder="e.g., ops/decision-2025-08-11", key="note_title")
+    note_tags = st.text_input("Tags (comma-separated)", value="note,dashboard", key="note_tags")
+    note_body = st.text_area("Body", height=180, placeholder="Write the fact/decision/instruction you want NovaOS to remember.", key="note_body")
+    col_a, col_b = st.columns([1,3])
+    with col_a:
+        if st.button("Save Note", key="note_save"):
+            tags = [t.strip() for t in note_tags.split(",") if t.strip()]
+            ack = memory_learn(note_title.strip(), note_body.strip(), tags=tags)
+            status = (ack or {}).get("status", "unknown")
+            if status in ("ok", "updated"):
+                st.success(f"Saved to memory as '{note_title.strip()}'.")
+            elif status == "disabled":
+                st.info(f"Memory disabled: {(ack or {}).get('reason')}")
+            else:
+                st.error(f"Memory write failed: {ack}")
+    with col_b:
+        st.caption("Tip: use stable titles like `ops/decision-YYYY-MM-DD` so you can overwrite/update easily.")
+
 # Approve Actions
 st.header('Approve Actions')
 approval = r.get('novaos:approval')
