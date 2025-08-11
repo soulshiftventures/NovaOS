@@ -45,7 +45,7 @@ def memory_search(query: str, k: int = 8):
         return []
 
 # novaos.ask() = memory-first LLM call with audit to Postgres
-from novaos import ask  # already tolerant of missing OPENAI_API_KEY (stub)
+from novaos import ask  # tolerant of missing OPENAI_API_KEY (stub)
 
 # ───────────────────────────── App environment ────────────────────────────────
 load_dotenv()
@@ -94,7 +94,7 @@ for group in ALL_GROUPS:
 st.set_page_config(page_title="NovaOS Central Hub", page_icon="🚀", layout="wide")
 st.title("NovaOS Central Hub")
 
-# Engine status (clear, first screen)
+# Engine status
 st.header("Engine Status")
 col_a, col_b = st.columns(2)
 with col_a:
@@ -106,7 +106,7 @@ with col_b:
     if not MODEL_ON:
         st.caption("Model stub active. Set OPENAI_API_KEY to enable real answers.")
 
-# Tabs for phases
+# Phases
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(['Discovery','AI UX Research','Planning','Creation','Testing','Finalizing','All Industries'])
 with tab1: st.write("Problem to Solve, Target Audience, Creative Brief, Constraints, Stakeholder Interviews")
 with tab2: st.write("User Research, Personas, User Behaviors, Competitor Analysis, Data Analysis")
@@ -116,7 +116,7 @@ with tab5: st.write("Usability Testing, Evaluation, Beta Launch, Final User Feed
 with tab6: st.write("Ordering, Packaging, Documentation, Rollout Plan, Go Live, Project Lessons/Debrief")
 with tab7: st.write("AI and ML, Ecommerce, Finance, Government, Healthcare, Manufacture and Warehouse, Real Estate, Transportation, Travel")
 
-# Agent Status Dashboard
+# Agent Status
 st.header("Agent Status Dashboard")
 df_agents = pd.DataFrame(
     [{'Agent': a, 'Group': g, 'Status': 'Active'} for g, group in [
@@ -126,7 +126,7 @@ df_agents = pd.DataFrame(
 )
 st.dataframe(df_agents, use_container_width=True)
 
-# Income Stream Pipeline
+# Income Streams
 st.header("Income Stream Pipeline")
 pipeline_data = pd.DataFrame([
     {'Stream': 'Stream 1','Status':'Planning','Revenue':0,'Container':'docker-stream1'},
@@ -196,7 +196,6 @@ else:
             if not title or not body:
                 st.error("Title and Body are required.")
             else:
-                # Include title inside content so title-only searches hit the content index as well.
                 content = f"{title}\n\n{body}" if title not in body else body
                 tags = [t.strip() for t in note_tags.split(",") if t.strip()]
                 ack = memory_learn(title, content, tags=tags)
@@ -251,8 +250,8 @@ def listener_thread():
             message = pubsub.get_message()
             if message and message['type'] == 'message':
                 cmd = json.loads(message['data'].decode('utf-8')); handle_command(cmd, r)
-            time.sleep(0.001); counter += 1
-            if counter % 60000 == 0:
+            time.sleep(0.01); counter += 1
+            if counter % 6000 == 0:
                 print("Listener Loop Running", flush=True); counter = 0
     except Exception as e:
         print(f"Listener Subscribe Error: {e}", flush=True)
@@ -269,5 +268,14 @@ def time_sentinel_thread():
             print(f"TimeSentinel Publish Error: {e}", flush=True)
         time.sleep(60)
 
-threading.Thread(target=listener_thread, daemon=True).start()
-threading.Thread(tar
+# Start background threads ONCE per process (Streamlit reruns the script often)
+def _ensure_background_threads_once():
+    if getattr(_ensure_background_threads_once, "_started", False):
+        return
+    t1 = threading.Thread(target=listener_thread, daemon=True)
+    t2 = threading.Thread(target=time_sentinel_thread, daemon=True)
+    t1.start(); t2.start()
+    _ensure_background_threads_once._started = True
+    print("[bg] threads started", flush=True)
+
+_ensure_background_threads_once()
