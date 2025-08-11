@@ -1,243 +1,208 @@
+"""
+NovaOS core brain — single entrypoint for all agent LLM calls.
+
+What this does:
+- Pulls top-K memory snippets from Postgres before any model call.
+- Builds a structured prompt (vision/guardrails/context/task).
+- Calls OpenAI if OPENAI_API_KEY is present; otherwise uses a safe stub so it never crashes.
+- Writes an audit trail to Postgres (inputs, context used, and output).
+- Returns {answer, context_used, trace_id} for downstream agents.
+
+Usage from ANY agent/module:
+    from novaos import ask
+    result = ask(
+        agent="NovaCoreAgent",
+        task="Draft a 3-step launch checklist for the dashboard",
+        query="ops/vision",   # optional; if omitted we use the task text
+        k=6                    # number of memory snippets to load
+    )
+    print(result["answer"])
+"""
+
+from __future__ import annotations
 import os
 import json
-import redis
 import time
-import threading
-from dotenv import load_dotenv
-import streamlit as st
-import pandas as pd
-import altair as alt
-import plotly.express as px
+import datetime as dt
+from typing import List, Dict, Any, Optional
 
-load_dotenv()
+# Memory API (DB-backed)
+try:
+    from agents._lib.context_pg import fetch_context, learn
+except Exception as e:
+    # Hard fail loudly once; callers still get a friendly error structure.
+    raise RuntimeError(f"[novaos] Unable to import memory backend: {e}")
 
-LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
-SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
+# --- OpenAI (optional) -------------------------------------------------------
+_HAS_OPENAI = False
+try:
+    from openai import OpenAI  # openai>=1.x
+    if os.getenv("OPENAI_API_KEY"):
+        _HAS_OPENAI = True
+except Exception:
+    _HAS_OPENAI = False
 
-# Mock Redis for local testing
-class MockRedis:
-    def __init__(self):
-        self.approval = None
-    def lrange(self, key, start, end):
-        return [b'CEO-VISION: Blueprint built', b'FoundationBuilder: Architecture set', b'DashboardAgent: Dashboard ready', b'Optimization Cycle']
-    def set(self, key, value):
-        self.approval = value
-    def get(self, key):
-        return self.approval.encode() if self.approval else None
-    def publish(self, channel, message):
-        pass
-    def pubsub(self, ignore_subscribe_messages=True):
-        class MockPubSub:
-            def subscribe(self, channel):
-                pass
-            def get_message(self):
-                return None
-        return MockPubSub()
+# --- Helpers -----------------------------------------------------------------
+def _now_iso() -> str:
+    return dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
-# Use mock if local, real if Render
-if os.getenv('RENDER') is None:
-    r = MockRedis()
-else:
-    r = redis.from_url(REDIS_URL)
+def _safe_json(obj: Any) -> str:
     try:
-        r.ping()
-        print("Redis Connected Successfully", flush=True)
-    except Exception as e:
-        print(f"Redis Connection Error: {e}", flush=True)
+        return json.dumps(obj, ensure_ascii=False)
+    except Exception:
+        return str(obj)
 
-print("NovaOS Started - Activating Corporate Structure", flush=True)
+def _mk_trace_id(agent: str) -> str:
+    ts = dt.datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+    return f"runs/{agent.lower()}/{ts}"
 
-# Corporate Structure: Agent Groups
-C_SUITE = ['CEO-VISION', 'CFO-AUTO', 'CTO-AUTO', 'CMO-AUTO', 'CPO-AUTO', 'CCO-AUTO', 'CHIEF-STAFF', 'CLARITY-COACH', 'CLO-AUTO']
-FOUNDATIONAL = ['AgentFactory', 'FoundationBuilder', 'NOVA-CORE', 'NovaHistorian']
-ANALYTICS = ['AnalyticsAgent', 'TrendAnalyzer', 'TrendFetcher', 'RESEARCH-ANALYST', 'RoadmapAgent', 'BusinessPlanAgent']
-BUILDERS = ['automation_architect', 'BuilderAgent', 'DashboardAgent', 'DashboardBuilder', 'UIUXBuilder', 'PROMPT-ENGINEER']
-TOOLS = ['BaserowSync', 'CloudManager', 'DockerDeployer', 'DROPBOX-FILE-MANAGER', 'ENERGY-GUARDIAN', 'FileAgent', 'GITHUB-DEPLOYER', 'LANGGRAPH-ROUTER', 'LemonSqueezyIntegrator', 'N8N-FLOW-BUILDER', 'NovaDashboard', 'PublerScheduler', 'RENDER-MANAGER', 'ShopifyIntegrator', 'TestAgent']
-SPECIALIZED = ['ai_systems_engineer', 'blueprints', 'core', 'CryptoStreamBuilder', 'StreamBuilder', 'TimeSentinel']
+def _summarize(snips: List[Dict[str, Any]], max_chars: int = 1200) -> str:
+    """Concatenate snippets into a bounded block."""
+    out = []
+    used = 0
+    for s in snips:
+        chunk = s.get("content", "")
+        if not chunk:
+            continue
+        # Light trim per snippet
+        chunk = chunk.strip()
+        if len(chunk) > 500:
+            chunk = chunk[:500] + " ..."
+        if used + len(chunk) + 1 > max_chars:
+            break
+        out.append(chunk)
+        used += len(chunk) + 1
+    return "\n\n".join(out)
 
-ALL_GROUPS = [C_SUITE, FOUNDATIONAL, ANALYTICS, BUILDERS, TOOLS, SPECIALIZED]
+# --- Prompt builder ----------------------------------------------------------
+SYSTEM_GUARDRAILS = """You are NovaOS Build Commander.
+- Be step-by-step, explicit, and TBI-friendly. No filler.
+- Use best-practice defaults; avoid open-ended choices.
+- Treat 'ops/vision' and 'ops/guardrails' as canonical if present.
+- If unsure, explain the assumption and proceed.
+"""
 
-for group in ALL_GROUPS:
-    for agent in group:
-        print(f"{agent} Activated in Group", flush=True)
+def _build_prompt(agent: str, task: str, memory_block: str) -> str:
+    return f"""# ROLE
+{SYSTEM_GUARDRAILS}
+Agent: {agent}
 
-st.set_page_config(page_title="NovaOS Central Hub", page_icon="🚀", layout="wide")
+# CONTEXT (from memory)
+{memory_block or "[no relevant memory found]"}
 
-st.title('NovaOS Central Hub')
+# TASK
+{task}
 
-# Tabs for Fuselab-inspired phases
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(['Discovery', 'AI UX Research', 'Planning', 'Creation', 'Testing', 'Finalizing', 'All Industries'])
+# OUTPUT RULES
+- Give the answer directly.
+- Use numbered steps if procedural.
+- Keep it concise and executable.
+"""
 
-with tab1:
-    st.write("Problem to Solve, Target Audience, Creative Brief, Constraints, Stakeholder Interviews")
-with tab2:
-    st.write("User Research, Personas, User Behaviors, Competitor Analysis, Data Analysis")
-with tab3:
-    st.write("Project/Product Goals, Resource Allocation, Project Planning, Documentation, Ideation")
-with tab4:
-    st.write("Sketches, Wireframes, Use Case Flows, Functionality, Low & High Fidelity Prototypes, A/B Testing")
-with tab5:
-    st.write("Usability Testing, Evaluation, Beta Launch, Final User Feedback, Heuristic Evaluations, Final Refinements")
-with tab6:
-    st.write("Ordering, Packaging, Documentation, Rollout Plan, Go Live, Project Lessons/Debrief")
-with tab7:
-    st.write("AI and ML, Ecommerce, Finance, Government, Healthcare, Manufacture and Warehouse, Real Estate, Transportation, Travel")
+# --- Model caller ------------------------------------------------------------
+def _call_model(prompt: str) -> str:
+    """Call OpenAI if configured; else return a deterministic stub."""
+    if _HAS_OPENAI:
+        client = OpenAI()
+        # gpt-4o-mini is cheap/fast; change model here centrally if needed.
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "system", "content": "You are a precise, direct operator."},
+                      {"role": "user", "content": prompt}],
+            temperature=0.2,
+        )
+        return (resp.choices[0].message.content or "").strip()
+    # Fallback: echo-style, still useful for dev and tests
+    return (
+        "MODEL_STUB: OpenAI not configured.\n"
+        "I would answer based on the provided context and task.\n"
+        "----\n"
+        + prompt[:1800]
+    )
 
-# Live Agent Dashboard
-st.header('Agent Status Dashboard')
-agents_data = [
-    {'Agent': agent, 'Group': group_name, 'Status': 'Active'}
-    for group_name, agents in [
-        ('C-Suite', C_SUITE),
-        ('Foundational', FOUNDATIONAL),
-        ('Analytics', ANALYTICS),
-        ('Builders', BUILDERS),
-        ('Tools', TOOLS),
-        ('Specialized', SPECIALIZED)
-    ]
-    for agent in agents
-]
-df_agents = pd.DataFrame(agents_data)
-st.dataframe(df_agents, use_container_width=True, column_config={
-    "Agent": st.column_config.TextColumn("Agent"),
-    "Group": st.column_config.TextColumn("Group"),
-    "Status": st.column_config.TextColumn("Status")
-})
+# --- Public API --------------------------------------------------------------
+def ask(agent: str, task: str, query: Optional[str] = None, k: int = 6) -> Dict[str, Any]:
+    """
+    Memory-first LLM call.
+    Returns:
+        {
+          "answer": str,
+          "context_used": [ {doc_id, score, preview}, ... ],
+          "trace_id": str
+        }
+    """
+    if not isinstance(agent, str) or not agent.strip():
+        raise ValueError("agent is required")
+    if not isinstance(task, str) or not task.strip():
+        raise ValueError("task is required")
 
-# Income Stream Pipeline
-st.header('Income Stream Pipeline')
-st.write("Placeholder for monitoring isolated streams (each in Docker containers).")
-pipeline_data = pd.DataFrame([
-    {'Stream': 'Stream 1', 'Status': 'Planning', 'Revenue': 0, 'Container': 'docker-stream1'},
-    {'Stream': 'Stream 2', 'Status': 'Testing', 'Revenue': 0, 'Container': 'docker-stream2'}
-])
-st.dataframe(pipeline_data, use_container_width=True)
-
-# Logs in expander with table
-st.header('Logs')
-with st.expander("View Logs"):
-    logs = r.lrange('novaos:logs', 0, -1)
-    df_logs = pd.DataFrame([log.decode() for log in logs], columns=["Logs"])
-    st.dataframe(df_logs, use_container_width=True)
-
-# Approve Actions
-st.header('Approve Actions')
-approval = r.get('novaos:approval')
-if approval and approval.decode() == 'approve':
-    st.success("Structure Approved - Ready for Analytics")
-else:
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button('Approve', key="approve"):
-            r.set('novaos:approval', 'approve')
-            print("Approved via dashboard", flush=True)
-            st.success("Approved structure")
-    with col2:
-        if st.button('Reject', key="reject"):
-            r.set('novaos:approval', 'reject')
-            print("Rejected via dashboard", flush=True)
-            st.error("Rejected structure")
-
-# System Overview Chart
-st.header('System Overview')
-group_data = pd.DataFrame({
-    'Group': ['C-Suite', 'Foundational', 'Analytics', 'Builders', 'Tools', 'Specialized'],
-    'Count': [len(C_SUITE), len(FOUNDATIONAL), len(ANALYTICS), len(BUILDERS), len(TOOLS), len(SPECIALIZED)]
-})
-chart = alt.Chart(group_data).mark_bar().encode(
-    x='Group',
-    y='Count',
-    color='Group'
-).properties(width=600, height=400)
-st.altair_chart(chart, use_container_width=True)
-
-# Placeholder Revenue Map
-st.header('Revenue Map (Placeholder)')
-fig = px.choropleth(locations=['USA'], locationmode="USA-states", color=[1], scope="usa", labels={'1':'Revenue'})
-st.plotly_chart(fig, use_container_width=True)
-
-def handle_command(cmd, r_handle):
+    q = (query or task).strip()
+    # 1) Pull memory
     try:
-        print(f"DEBUG: Command received: {cmd}", flush=True)
-        agent = cmd.get('agent')
-        payload = cmd.get('payload')
-        if agent == 'CEO-VISION':
-            if payload.get('action') == 'build_blueprint':
-                blueprint = "NovaOS Blueprint: C-Suite oversees strategy, Foundational sets up business, Analytics drives data, Builders/Tools execute, Specialized handles tasks. Replicable for 100+ streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Blueprint Built', 'details': blueprint}))
-                print("CEO-VISION: Blueprint built", flush=True)
-        elif agent == 'FoundationBuilder':
-            if payload.get('action') == 'setup_business':
-                setup = "Business Architecture: Shopify hub, Lemon Squeezy payments, Redis for data. Ready for streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Business Setup', 'details': setup}))
-                print("FoundationBuilder: Architecture set", flush=True)
-        elif agent == 'DashboardAgent':
-            if payload.get('action') == 'build_dashboard':
-                dashboard = "Central Dashboard: View agents, approve actions, monitor logs at the deployed URL."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Dashboard Built', 'details': dashboard}))
-                print("DashboardAgent: Dashboard ready", flush=True)
-        elif agent == 'DEVOPS-ENGINEER':
-            if payload.get('action') == 'migrate_stack':
-                migration = "Migration Started: Setup WooCommerce on Vercel, integrate Stripe/Printful/Supabase/Alchemy for streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Started', 'details': migration}))
-                print("DEVOPS-ENGINEER: Migration to new stack initiated", flush=True)
-                # Simulate migration steps
-                print("DEVOPS-ENGINEER: Cloning WooCommerce repo to Vercel...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Cloning WooCommerce to Vercel'}))
-                time.sleep(1)
-                print("DEVOPS-ENGINEER: Integrating Stripe API...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Stripe'}))
-                time.sleep(1)
-                print("DEVOPS-ENGINEER: Integrating Printful API...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Printful'}))
-                time.sleep(1)
-                print("DEVOPS-ENGINEER: Setting up Supabase DB...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Setting up Supabase'}))
-                time.sleep(1)
-                print("DEVOPS-ENGINEER: Integrating Alchemy for tokenized assets...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Alchemy'}))
-                time.sleep(1)
-                print("DEVOPS-ENGINEER: Migration Completed", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Completed', 'details': 'New stack ready for streams'}))
+        snippets = fetch_context(q, k=max(1, int(k)))
     except Exception as e:
-        print(f"Command Error: {e}", flush=True)
+        snippets = []
+        # Persist the failure in memory for audit
+        _safe_learn("ops/errors", f"[{_now_iso()}] fetch_context failed for '{q}': {e}", tags=["error","memory"])
 
-def listener_thread():
-    print("Listener Thread Started", flush=True)
-    pubsub = r.pubsub(ignore_subscribe_messages=True)
+    # 2) Build prompt
+    mem_block = _summarize(snippets)
+    prompt = _build_prompt(agent, task, mem_block)
+
+    # 3) Call model (or stub)
+    start = time.time()
+    answer = _call_model(prompt)
+    dur_ms = int((time.time() - start) * 1000)
+
+    # 4) Persist audit (inputs, context, output)
+    trace_id = _mk_trace_id(agent)
     try:
-        pubsub.subscribe('novaos:commands')
-        print("Subscribed to novaos:commands", flush=True)
-        counter = 0
-        while True:
-            message = pubsub.get_message()
-            if message and message['type'] == 'message':
-                cmd = json.loads(message['data'].decode('utf-8'))
-                print(f"Received command: {cmd}", flush=True)
-                handle_command(cmd, r)
-            time.sleep(0.001)
-            counter += 1
-            if counter % 60000 == 0:
-                print("Listener Loop Running", flush=True)
-                counter = 0
+        ctx_preview = [
+            {
+                "doc_id": s.get("doc_id", ""),
+                "score": float(s.get("score", 0.0)),
+                "preview": (s.get("content", "")[:180] + "…") if s.get("content") else ""
+            }
+            for s in snippets
+        ]
+        _safe_learn(
+            doc_id=f"{trace_id}/input",
+            content=_safe_json({
+                "ts": _now_iso(),
+                "agent": agent,
+                "task": task,
+                "query": q,
+                "k": k,
+                "context_used": ctx_preview,
+            }),
+            tags=["trace","input"]
+        )
+        _safe_learn(
+            doc_id=f"{trace_id}/output",
+            content=_safe_json({
+                "ts": _now_iso(),
+                "agent": agent,
+                "duration_ms": dur_ms,
+                "answer": answer
+            }),
+            tags=["trace","output"]
+        )
     except Exception as e:
-        print(f"Listener Subscribe Error: {e}", flush=True)
+        _safe_learn("ops/errors", f"[{_now_iso()}] audit persist failed for '{trace_id}': {e}", tags=["error","audit"])
 
-def time_sentinel_thread():
-    print("TimeSentinel Thread Started", flush=True)
-    while True:
-        try:
-            optimization = "Monitored streams: Optimized for $25k/month total revenue."
-            r.publish('novaos:logs', json.dumps({'event': 'Optimization Cycle', 'details': optimization}))
-            print("Optimization Cycle", flush=True)
-        except Exception as e:
-            print(f"TimeSentinel Publish Error: {e}", flush=True)
-        time.sleep(60)
+    return {"answer": answer, "context_used": snippets, "trace_id": trace_id}
 
-threading.Thread(target=listener_thread).start()
-threading.Thread(target=time_sentinel_thread).start()
+# --- Robust memory write -----------------------------------------------------
+def _safe_learn(doc_id: str, content: str, tags: Optional[List[str]] = None) -> None:
+    try:
+        learn(doc_id, content, tags or [])
+    except Exception as _e:
+        # Last resort: print so Render logs capture it
+        print(f"[novaos._safe_learn] failed doc_id={doc_id}: {_e}", flush=True)
 
-# Keep main process alive
-while True:
-    time.sleep(60)
+# Optional: quick self-test when run directly
+if __name__ == "__main__":
+    print("[novaos] self-test starting…", flush=True)
+    res = ask(agent="NovaCoreAgent", task="Summarize our current NovaOS vision in 3 bullets.", query="ops/vision", k=5)
+    print("[novaos] answer:\n", res["answer"])
+    print("[novaos] trace_id:", res["trace_id"])
