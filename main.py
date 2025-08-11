@@ -10,13 +10,48 @@ import pandas as pd
 import altair as alt
 import plotly.express as px
 
+# --- Memory (Postgres) client import with safe fallback ---
+MEMORY_ON = False
+def _memory_disabled_reason():
+    if not os.environ.get("DATABASE_URL"):
+        return "DATABASE_URL is not set"
+    return "context_pg import failed"
+
+try:
+    from agents._lib.context_pg import fetch_context, learn
+    if os.environ.get("DATABASE_URL"):
+        MEMORY_ON = True
+except Exception as _e:
+    MEMORY_ON = False
+
+def memory_learn(title: str, body: str, tags=None):
+    """Write to memory if enabled; never crash UI."""
+    if not MEMORY_ON:
+        return {"status": "disabled", "reason": _memory_disabled_reason()}
+    try:
+        return learn(title, body, tags or [])
+    except Exception as e:
+        print(f"[memory.learn] ERROR: {e}", flush=True)
+        return {"status": "error", "error": str(e)}
+
+def memory_search(query: str, k: int = 8):
+    """Read context if enabled; never crash UI."""
+    if not MEMORY_ON:
+        return []
+    try:
+        return fetch_context(query, k=k)
+    except Exception as e:
+        print(f"[memory.search] ERROR: {e}", flush=True)
+        return []
+
+# --- App env ---
 load_dotenv()
 
 LEMON_SQUEEZY_API_KEY = os.getenv('LEMON_SQUEEZY_API_KEY')
 SHOPIFY_API_KEY = os.getenv('SHOPIFY_API_KEY')
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 
-# Mock Redis for local testing
+# --- Redis (mock for local) ---
 class MockRedis:
     def __init__(self):
         self.approval = None
@@ -63,8 +98,8 @@ for group in ALL_GROUPS:
     for agent in group:
         print(f"{agent} Activated in Group", flush=True)
 
+# --- Streamlit UI ---
 st.set_page_config(page_title="NovaOS Central Hub", page_icon="🚀", layout="wide")
-
 st.title('NovaOS Central Hub')
 
 # Tabs for Fuselab-inspired phases
@@ -122,6 +157,26 @@ with st.expander("View Logs"):
     df_logs = pd.DataFrame([log.decode() for log in logs], columns=["Logs"])
     st.dataframe(df_logs, use_container_width=True)
 
+# --- Memory Search (reads from Postgres) ---
+st.header('Memory Search (Postgres)')
+if not MEMORY_ON:
+    st.info(f"Memory disabled: {_memory_disabled_reason()}. App will still run.")
+else:
+    q = st.text_input("Query", value="NovaOS", key="mem_query")
+    k = st.number_input("Results", min_value=1, max_value=20, value=5, step=1, key="mem_k")
+    if st.button("Search Memory", key="mem_search_btn"):
+        results = memory_search(q, k=int(k))
+        rows = []
+        for rec in results:
+            content = rec.get("content", "")
+            preview = (content[:200] + ("..." if len(content) > 200 else "")).replace("\n", " ")
+            rows.append({
+                "doc_id": rec.get("doc_id", ""),
+                "score": round(rec.get("score", 0.0), 4),
+                "preview": preview
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
 # Approve Actions
 st.header('Approve Actions')
 approval = r.get('novaos:approval')
@@ -134,11 +189,15 @@ else:
             r.set('novaos:approval', 'approve')
             print("Approved via dashboard", flush=True)
             st.success("Approved structure")
+            # Write decision to memory
+            memory_learn("approval", "User approved NovaOS structure via dashboard.", tags=["decision","dashboard"])
     with col2:
         if st.button('Reject', key="reject"):
             r.set('novaos:approval', 'reject')
             print("Rejected via dashboard", flush=True)
             st.error("Rejected structure")
+            # Write decision to memory
+            memory_learn("rejection", "User rejected NovaOS structure via dashboard.", tags=["decision","dashboard"])
 
 # System Overview Chart
 st.header('System Overview')
@@ -158,6 +217,13 @@ st.header('Revenue Map (Placeholder)')
 fig = px.choropleth(locations=['USA'], locationmode="USA-states", color=[1], scope="usa", labels={'1':'Revenue'})
 st.plotly_chart(fig, use_container_width=True)
 
+# --- Command handling (writes events to memory) ---
+def _log_and_mem(r_handle, event: str, details: str, mem_title: str, tags=None):
+    try:
+        r_handle.publish('novaos:logs', json.dumps({'event': event, 'details': details}))
+    finally:
+        memory_learn(mem_title, f"{event}: {details}", tags or ["agent","event"])
+
 def handle_command(cmd, r_handle):
     try:
         print(f"DEBUG: Command received: {cmd}", flush=True)
@@ -166,41 +232,37 @@ def handle_command(cmd, r_handle):
         if agent == 'CEO-VISION':
             if payload.get('action') == 'build_blueprint':
                 blueprint = "NovaOS Blueprint: C-Suite oversees strategy, Foundational sets up business, Analytics drives data, Builders/Tools execute, Specialized handles tasks. Replicable for 100+ streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Blueprint Built', 'details': blueprint}))
+                _log_and_mem(r_handle, 'Blueprint Built', blueprint, "ceo_vision_blueprint", tags=["ceo","blueprint"])
                 print("CEO-VISION: Blueprint built", flush=True)
         elif agent == 'FoundationBuilder':
             if payload.get('action') == 'setup_business':
                 setup = "Business Architecture: Shopify hub, Lemon Squeezy payments, Redis for data. Ready for streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Business Setup', 'details': setup}))
+                _log_and_mem(r_handle, 'Business Setup', setup, "foundation_setup", tags=["foundation","setup"])
                 print("FoundationBuilder: Architecture set", flush=True)
         elif agent == 'DashboardAgent':
             if payload.get('action') == 'build_dashboard':
                 dashboard = "Central Dashboard: View agents, approve actions, monitor logs at the deployed URL."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Dashboard Built', 'details': dashboard}))
+                _log_and_mem(r_handle, 'Dashboard Built', dashboard, "dashboard_built", tags=["dashboard"])
                 print("DashboardAgent: Dashboard ready", flush=True)
         elif agent == 'DEVOPS-ENGINEER':
             if payload.get('action') == 'migrate_stack':
                 migration = "Migration Started: Setup WooCommerce on Vercel, integrate Stripe/Printful/Supabase/Alchemy for streams."
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Started', 'details': migration}))
+                _log_and_mem(r_handle, 'Migration Started', migration, "devops_migrate_start", tags=["devops","migrate"])
                 print("DEVOPS-ENGINEER: Migration to new stack initiated", flush=True)
-                # Simulate migration steps
-                print("DEVOPS-ENGINEER: Cloning WooCommerce repo to Vercel...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Cloning WooCommerce to Vercel'}))
-                time.sleep(1)
-                print("DEVOPS-ENGINEER: Integrating Stripe API...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Stripe'}))
-                time.sleep(1)
-                print("DEVOPS-ENGINEER: Integrating Printful API...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Printful'}))
-                time.sleep(1)
-                print("DEVOPS-ENGINEER: Setting up Supabase DB...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Setting up Supabase'}))
-                time.sleep(1)
-                print("DEVOPS-ENGINEER: Integrating Alchemy for tokenized assets...", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Step', 'details': 'Integrating Alchemy'}))
-                time.sleep(1)
+                # Simulated migration steps
+                steps = [
+                    ('Migration Step', 'Cloning WooCommerce to Vercel'),
+                    ('Migration Step', 'Integrating Stripe'),
+                    ('Migration Step', 'Integrating Printful'),
+                    ('Migration Step', 'Setting up Supabase'),
+                    ('Migration Step', 'Integrating Alchemy'),
+                ]
+                for ev, det in steps:
+                    print(f"DEVOPS-ENGINEER: {det}...", flush=True)
+                    _log_and_mem(r_handle, ev, det, "devops_migrate_step", tags=["devops","migrate"])
+                    time.sleep(1)
+                _log_and_mem(r_handle, 'Migration Completed', 'New stack ready for streams', "devops_migrate_done", tags=["devops","migrate"])
                 print("DEVOPS-ENGINEER: Migration Completed", flush=True)
-                r_handle.publish('novaos:logs', json.dumps({'event': 'Migration Completed', 'details': 'New stack ready for streams'}))
     except Exception as e:
         print(f"Command Error: {e}", flush=True)
 
@@ -231,13 +293,15 @@ def time_sentinel_thread():
         try:
             optimization = "Monitored streams: Optimized for $25k/month total revenue."
             r.publish('novaos:logs', json.dumps({'event': 'Optimization Cycle', 'details': optimization}))
+            # Log to memory as periodic telemetry
+            memory_learn("optimization_cycle", optimization, tags=["sentinel","telemetry"])
             print("Optimization Cycle", flush=True)
         except Exception as e:
             print(f"TimeSentinel Publish Error: {e}", flush=True)
         time.sleep(60)
 
-threading.Thread(target=listener_thread).start()
-threading.Thread(target=time_sentinel_thread).start()
+threading.Thread(target=listener_thread, daemon=True).start()
+threading.Thread(target=time_sentinel_thread, daemon=True).start()
 
 # Keep main process alive
 while True:
