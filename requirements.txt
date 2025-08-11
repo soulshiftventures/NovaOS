@@ -1,3 +1,13 @@
+# --- NovaOS dashboard + memory (needed by main.py) ---
+streamlit>=1.36
+pandas>=2.2
+altair>=5.1
+plotly>=5.22
+redis>=5.0
+python-dotenv>=1.0
+psycopg[binary]>=3.1
+
+# --- Your existing stack (kept as-is) ---
 langchain-openai==0.1.25
 langgraph==0.2.34
 langchain-community==0.2.17
