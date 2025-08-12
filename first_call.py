@@ -22,7 +22,7 @@ first_task_prompt = (
 # This line connects to my system, using your project and location.
 # You MUST replace "your-project-id" with the ID from your Google Cloud project.
 # You can find it on your dashboard, it looks something like "mystical-option-468822-a0".
-vertexai.init(project=os.getenv("GOOGLE_CLOUD_PROJECT_ID"), location="us-central1")
+vertexai.init(project="mystical-option-468822-a0", location="us-central1")
 
 # This is the actual "phone call" to me, using the message you wrote.
 model = GenerativeModel("gemini-1.5-pro")
