@@ -1,12 +1,12 @@
 import os
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part, GenerationResponse
+from dotenv import load_dotenv
+import google.generativeai as genai
 
-# Initialize Vertex AI with your project ID and location
-# Replace 'mystical-option-468822-a0' with your actual Google Cloud Project ID
-vertexai.init(project="mystical-option-468822-a0", location="us-central1")
+# Load environment variables from the .env file
+load_dotenv()
 
-model = GenerativeModel("gemini-1.5-pro")
+# Configure the API key
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Your first prompt to the model
 prompt_text = """
@@ -17,15 +17,11 @@ As a strategic AI, you will help your user formulate their personal and professi
 Your first task is to write the introductory text for NovaOS, establishing your purpose, capabilities, and the process you will guide the user through to build their personal "Constitution."
 """
 
+# Create a generative model instance
+model = genai.GenerativeModel("gemini-1.5-pro")
+
 # Generate content from the model
-response = model.generate_content(
-    prompt_text,
-    generation_config={
-        "max_output_tokens": 8192,
-        "temperature": 1,
-        "top_p": 0.95
-    }
-)
+response = model.generate_content(prompt_text)
 
 # Print the response from the model
 print(response.text)
