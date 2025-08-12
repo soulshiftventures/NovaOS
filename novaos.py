@@ -3,7 +3,7 @@ import os
 import uuid
 from typing import List, Dict, Any
 
-# ───────────────────────── Optional memory import ─────────────────────────────
+# ───────────────────────── Memory (optional) ─────────────────────────
 def _memory_enabled() -> bool:
     return bool(os.environ.get("DATABASE_URL"))
 
@@ -24,26 +24,36 @@ def _get_context(query: str, k: int) -> List[Dict[str, Any]]:
         print(f"[novaos] context fetch error: {e}", flush=True)
         return []
 
-# ─────────────────────────── LLM call (OpenAI v1) ─────────────────────────────
-def _call_model(prompt: str) -> str:
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        return "(stub) Model disabled — set OPENAI_API_KEY to enable real answers.\n\n" + prompt[:600]
+# ───────────────────────── Model selection ───────────────────────────
+def _candidate_models() -> List[str]:
+    """
+    Priority:
+      1) OPENAI_MODEL (your explicit pick — e.g., a v5 name)
+      2) OPENAI_MODEL_FALLBACKS (comma-separated)
+      3) sane defaults (5-first, then 4-family)
+    """
+    picks = []
+    env_pick = (os.environ.get("OPENAI_MODEL") or "").strip()
+    if env_pick:
+        picks.append(env_pick)
 
-    from openai import OpenAI
-    import httpx  # present via openai dependency
+    env_fallbacks = (os.environ.get("OPENAI_MODEL_FALLBACKS") or "").strip()
+    if env_fallbacks:
+        picks.extend([m.strip() for m in env_fallbacks.split(",") if m.strip()])
 
-    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-    proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    # Defaults — safe, common names. If your account has v5 models, put their exact IDs in OPENAI_MODEL.
+    defaults = [
+        "gpt-5o", "gpt-5o-mini",   # if available on your account
+        "gpt-4.1", "gpt-4.1-mini",
+        "gpt-4o", "gpt-4o-mini",
+    ]
+    for m in defaults:
+        if m not in picks:
+            picks.append(m)
+    return picks
 
-    http_client = None
-    if proxy:
-        # Correct proxy wiring for OpenAI v1.x
-        http_client = httpx.Client(proxies=proxy, timeout=60.0, follow_redirects=True)
-
-    print("[novaos] building OpenAI client (http_client set:", bool(http_client), ")", flush=True)
-    client = OpenAI(api_key=api_key, http_client=http_client)
-
+# ─────────────────────────── LLM call ────────────────────────────────
+def _call_model_with(model: str, prompt: str, client) -> str:
     rsp = client.responses.create(
         model=model,
         input=[
@@ -59,19 +69,45 @@ def _call_model(prompt: str) -> str:
     )
     return rsp.output_text
 
-# ───────────────────────────── Public entrypoint ──────────────────────────────
+def _call_model(prompt: str) -> str:
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return "(stub) Model disabled — set OPENAI_API_KEY to enable real answers.\n\n" + prompt[:600]
+
+    from openai import OpenAI
+    import httpx
+
+    proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    http_client = httpx.Client(proxies=proxy, timeout=60.0, follow_redirects=True) if proxy else None
+
+    print("[novaos] building OpenAI client (http_client set:", bool(http_client), ")", flush=True)
+    client = OpenAI(api_key=api_key, http_client=http_client)
+
+    last_err = None
+    for model in _candidate_models():
+        try:
+            print(f"[novaos] trying model: {model}", flush=True)
+            return _call_model_with(model, prompt, client)
+        except Exception as e:
+            msg = str(e).lower()
+            # keep going if it's a model/availability issue; bail on hard failures later
+            if "model" in msg and ("not found" in msg or "does not exist" in msg or "unknown" in msg):
+                last_err = e
+                continue
+            if "rate limit" in msg or "429" in msg:
+                last_err = e
+                continue
+            # capture but still try next; worst case we return last error
+            last_err = e
+            continue
+
+    return f"(error) unable to get a model response. last_error={last_err}"
+
+# ───────────────────────── Public entrypoint ─────────────────────────
 def ask(agent: str, task: str, query: str | None = None, k: int = 6) -> Dict[str, Any]:
-    """
-    Memory-first ask:
-    - Pull K snippets from Postgres (if DATABASE_URL present)
-    - Build a prompt
-    - Call OpenAI (or stub if no key)
-    - Return answer + context used + trace_id
-    """
     q = (query or task or "").strip()
     ctx = _get_context(q, k=k) if q else []
 
-    # Build compact context block
     lines = []
     for i, s in enumerate(ctx[:k]):
         doc = s.get("doc_id", "")
