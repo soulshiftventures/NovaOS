@@ -1,0 +1,53 @@
+name: Memory Smoke
+on:
+  workflow_dispatch:
+    inputs:
+      q:
+        description: "Query to search"
+        required: false
+        default: "NovaOS"
+
+concurrency:
+  group: memory-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL_GHA }}
+      QUERY: ${{ github.event.inputs.q }}
+    steps:
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install psycopg
+        run: python -m pip install --quiet "psycopg[binary]>=3.1"
+
+      - name: Download repo as zip (no git)
+        run: |
+          curl -sS -H "Authorization: token ${{ github.token }}" \
+               -L "https://api.github.com/repos/${{ github.repository }}/zipball/${{ github.sha }}" \
+               -o src.zip
+          unzip -q src.zip -d src
+          REPO_DIR="$(ls -1 src)"
+          mkdir -p workspace
+          shopt -s dotglob
+          mv "src/$REPO_DIR"/* workspace/
+          rm -rf src src.zip
+          ls -la workspace/agents/_lib | sed -n '1,200p' || true
+          ls -la workspace/scripts | sed -n '1,200p' || true
+
+      - name: Check required files
+        run: |
+          test -f workspace/agents/_lib/context_pg.py || (echo "MISSING: agents/_lib/context_pg.py"; exit 11)
+          test -f workspace/scripts/memory_search.py || (echo "MISSING: scripts/memory_search.py"; exit 12)
+
+      - name: Run smoke
+        working-directory: workspace
+        env:
+          PYTHONPATH: ${{ github.workspace }}/workspace
+        run: python -u scripts/memory_search.py
