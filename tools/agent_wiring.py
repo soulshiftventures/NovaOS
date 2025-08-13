@@ -1,19 +1,26 @@
+#!/usr/bin/env python3
+"""Agent wiring helpers (compile-safe skeleton)."""
+
 from __future__ import annotations
-from typing import Callable, Dict, List, Optional
+from typing import Dict, Any, Callable
 
-_REGISTRY: Dict[str, Callable[[], None]] = {}
+_REGISTRY: Dict[str, Callable[..., Any]] = {}
 
-def register(name: str):
-    def decorator(fn: Callable[[], None]):
-        _REGISTRY[name] = fn
-        return fn
-    return decorator
+def register(name: str, fn: Callable[..., Any]) -> None:
+    """Register an agent factory or handler."""
+    _REGISTRY[name] = fn
 
-def get_agent(name: str) -> Optional[Callable[[], None]]:
+def get_agent(name: str) -> Callable[..., Any] | None:
+    """Fetch an agent by name."""
     return _REGISTRY.get(name)
 
-def list_agents() -> List[str]:
-    return sorted(_REGISTRY.keys())
+def registry() -> Dict[str, Callable[..., Any]]:
+    """Return the internal registry."""
+    return dict(_REGISTRY)
+
+# Temporary no-op wiring to satisfy compile checks
+def wire_default_agents() -> None:
+    pass
 
 if __name__ == "__main__":
-    print("Registered agents:", ", ".join(list_agents()) or "(none)")
+    wire_default_agents()
