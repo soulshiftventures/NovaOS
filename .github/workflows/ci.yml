@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          set -e
+          if [ -f requirements.txt ]; then REQ=requirements.txt
+          elif [ -f services/novaos_dashboard/requirements.txt ]; then REQ=services/novaos_dashboard/requirements.txt
+          else REQ=""
+          fi
+          if [ -n "$REQ" ]; then
+            python -m pip install --upgrade pip
+            pip install -r "$REQ"
+          else
+            echo "No requirements file found; continuing"
+          fi
+      - name: Compile all Python (syntax check)
+        run: python -m compileall -q .
+
+  smoke:
+    name: smoke
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Lightweight app sanity
+        run: |
+          python - <<'PY'
+          import os, sys
+          missing = [p for p in ["main.py"] if not os.path.exists(p)]
+          if missing:
+              print("Missing:", missing); sys.exit(1)
+          print("SMOKE_OK")
+          PY
+
+  index:
+    name: index
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Ensure PG index (skip if no DATABASE_URL)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python -m pip install --quiet "psycopg[binary]>=3.1"
+          python - <<'PY'
+          import os, psycopg
+          db=os.environ.get("DATABASE_URL","").strip()
+          if not db:
+              print("No DATABASE_URL; skipping."); raise SystemExit(0)
+          if 'sslmode=' not in db: db += ('&' if '?' in db else '?') + 'sslmode=require'
+          with psycopg.connect(db, autocommit=True) as conn:
+              with conn.cursor() as cur:
+                  cur.execute("CREATE INDEX IF NOT EXISTS memory_chunks_fts_idx ON memory_chunks USING GIN (to_tsvector('english', content));")
+              with conn.cursor() as cur:
+                  cur.execute("VACUUM ANALYZE memory_chunks;")
+          print("INDEX_OK")
+          PY
