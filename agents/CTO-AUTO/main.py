@@ -1,5 +1,3 @@
-mkdir -p agents/CTO-AUTO
-cat > agents/CTO-AUTO/main.py <<'PY'
 #!/usr/bin/env python3
 """CTO-AUTO Agent (compile-safe stub)."""
 
@@ -14,4 +12,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-PY
