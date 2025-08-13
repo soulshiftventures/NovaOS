@@ -1,26 +1,19 @@
+# tools/agent_wiring.py
 #!/usr/bin/env python3
-"""Agent wiring helpers (compile-safe skeleton)."""
+"""
+Agent wiring utilities (compile-safe stub).
+This keeps CI's "python -m compileall" green while we iterate.
+"""
 
-from __future__ import annotations
-from typing import Dict, Any, Callable
+from typing import Any, Dict
 
-_REGISTRY: Dict[str, Callable[..., Any]] = {}
+def wire_agent(name: str, **kwargs: Any) -> Dict[str, Any]:
+    """Return a dummy spec to satisfy imports during CI."""
+    return {"name": name, "config": kwargs}
 
-def register(name: str, fn: Callable[..., Any]) -> None:
-    """Register an agent factory or handler."""
-    _REGISTRY[name] = fn
-
-def get_agent(name: str) -> Callable[..., Any] | None:
-    """Fetch an agent by name."""
-    return _REGISTRY.get(name)
-
-def registry() -> Dict[str, Callable[..., Any]]:
-    """Return the internal registry."""
-    return dict(_REGISTRY)
-
-# Temporary no-op wiring to satisfy compile checks
-def wire_default_agents() -> None:
+def main() -> None:
+    # Placeholder for manual testing
     pass
 
 if __name__ == "__main__":
-    wire_default_agents()
+    main()
