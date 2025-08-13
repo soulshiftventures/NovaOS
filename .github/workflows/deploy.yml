@@ -1,0 +1,25 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+jobs:
+  render:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy dashboard (Render)
+        if   {{ secrets.RENDER_DASHBOARD_DEPLOY_HOOK != '' }}
+        env:
+          HOOK: ${{ secrets.RENDER_DASHBOARD_DEPLOY_HOOK }}
+        run: |
+          curl -fsS -X POST "$HOOK" -H "Accept: application/json" || echo "dashboard hook failed"
+
+      - name: Deploy memory API (Render)
+        if: ${{ secrets.RENDER_MEMORY_DEPLOY_HOOK != '' }}
+        env:
+          HOOK: ${{ secrets.RENDER_MEMORY_DEPLOY_HOOK }}
+        run: |
+          curl -fsS -X POST "$HOOK" -H "Accept: application/json" || echo "memory hook failed"
