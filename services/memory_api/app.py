@@ -1,11 +1,10 @@
-# services/memory_api/app.py
+# services/memory-api/app.py
 """
-NovaOS Memory API
+NovaOS Memory API using Supabase
 
 This FastAPI application stores and retrieves chat messages in a Supabase
-table called "messages". It assumes SUPABASE_URL and SUPABASE_ANON_KEY are
-set in the environment. If those variables are missing, the service will
-still run but the /messages endpoints will return errors.
+table called "messages". SUPABASE_URL and SUPABASE_ANON_KEY must be set
+as environment variables for Supabase access.
 """
 
 from fastapi import FastAPI, HTTPException
@@ -14,7 +13,6 @@ from typing import List
 import os
 from datetime import datetime
 
-# Attempt to import Supabase client
 try:
     from supabase import create_client, Client  # type: ignore
 except ImportError:
@@ -23,7 +21,7 @@ except ImportError:
 
 app = FastAPI(title="NovaOS Memory API")
 
-# Load Supabase credentials from environment
+# Load Supabase credentials
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
@@ -39,7 +37,7 @@ class Message(BaseModel):
 
 @app.get("/")
 def root() -> dict[str, str]:
-    """Health check root endpoint."""
+    """Root endpoint to confirm service status."""
     return {
         "status": "online",
         "service": "novaos-memory",
@@ -55,7 +53,7 @@ def health() -> dict[str, bool]:
 def add_message(msg: Message) -> dict[str, str]:
     """
     Store a message in the Supabase 'messages' table.
-    Expects a JSON body like {"content": "your text"}.
+    Expects JSON body: {"content": "<text>"}
     """
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -64,7 +62,7 @@ def add_message(msg: Message) -> dict[str, str]:
         "timestamp": datetime.utcnow().isoformat(),
     }
     result = supabase.table("messages").insert(data).execute()
-    if result.data is None:
+    if not result.data:
         raise HTTPException(status_code=500, detail="Failed to insert")
     return {"ok": True, "id": result.data[0]["id"]}
 
@@ -72,7 +70,7 @@ def add_message(msg: Message) -> dict[str, str]:
 def get_messages(limit: int = 100) -> List[Message]:
     """
     Retrieve the latest messages from Supabase.
-    The limit parameter controls how many messages are returned.
+    Use the 'limit' query parameter to limit results.
     """
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
