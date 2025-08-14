@@ -1,15 +1,13 @@
 # mcp/memory_server/memory_api.py
 """
-NovaOS Memory API using Supabase
+NovaOS Memory API using Postgres
 
-This FastAPI application stores and retrieves chat messages in a Supabase
+This FastAPI application stores and retrieves chat messages in a Postgres
 table called "messages". It also keeps the original health and DB ping
 endpoints for backwards compatibility.
 
 Environment variables required:
-- SUPABASE_URL
-- SUPABASE_KEY (preferred) or SUPABASE_ANON_KEY
-- DATABASE_URL (optional, used only for /db/ping)
+- DATABASE_URL (connection string for Postgres)
 """
 
 from fastapi import FastAPI, HTTPException
@@ -17,14 +15,7 @@ from pydantic import BaseModel
 from typing import List
 from datetime import datetime
 import os
-import psycopg  # only used by db_ping
-
-# Try to import the Supabase client
-try:
-    from supabase import create_client, Client  # type: ignore
-except ImportError:
-    create_client = None
-    Client = None  # type: ignore
+import psycopg
 
 app = FastAPI(title="NovaOS Memory API")
 
@@ -32,19 +23,39 @@ def _git_sha() -> str:
     # Prefer Render-provided commit envs if present
     return os.getenv("RENDER_GIT_COMMIT", os.getenv("GIT_SHA", "dev"))
 
-# Configure Supabase client
-# We support both SUPABASE_KEY and SUPABASE_ANON_KEY for backwards compatibility.
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+# Postgres DSN
+DB_DSN = os.getenv("DATABASE_URL", "").strip()
 
-supabase: "Client | None" = None
-if SUPABASE_URL and SUPABASE_KEY and create_client:
+def init_db() -> None:
+    """
+    Create the messages table if it does not exist.
+    """
+    if not DB_DSN:
+        return
+    dsn = DB_DSN
+    # enforce SSL in hosted envs
+    if "sslmode=" not in dsn:
+        dsn = dsn + ("&" if "?" in dsn else "?") + "sslmode=require"
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception:
-        # If the client fails to initialize (e.g. invalid key), leave supabase
-        # unset so the /messages endpoints will return a helpful error.
-        supabase = None
+        with psycopg.connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id SERIAL PRIMARY KEY,
+                        content TEXT NOT NULL,
+                        timestamp TIMESTAMPTZ NOT NULL
+                    )
+                    """
+                )
+                conn.commit()
+    except Exception as e:
+        # Log errors during table creation; the /messages endpoints will
+        # surface DB errors on use.
+        print("init_db error:", e)
+
+# Initialise DB on startup
+init_db()
 
 # Pydantic model for incoming messages
 class Message(BaseModel):
@@ -63,11 +74,10 @@ def db_ping():
     """
     Check connectivity to a Postgres database defined by DATABASE_URL.
     """
-    dsn = os.getenv("DATABASE_URL", "").strip()
-    if not dsn:
+    if not DB_DSN:
         return {"ok": False, "error": "DATABASE_URL not set"}
     try:
-        # enforce SSL in hosted envs
+        dsn = DB_DSN
         if "sslmode=" not in dsn:
             dsn = dsn + ("&" if "?" in dsn else "?") + "sslmode=require"
         with psycopg.connect(dsn) as conn:
@@ -81,34 +91,46 @@ def db_ping():
 @app.post("/messages")
 def add_message(msg: Message) -> dict[str, str]:
     """
-    Store a message in the Supabase 'messages' table.
+    Store a message in the Postgres 'messages' table.
     Expects JSON body: {"content": "<text>"}.
     """
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    data = {
-        "content": msg.content,
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-    result = supabase.table("messages").insert(data).execute()
-    if not result.data:
-        raise HTTPException(status_code=500, detail="Failed to insert")
-    return {"ok": True, "id": result.data[0]["id"]}
+    if not DB_DSN:
+        raise HTTPException(status_code=500, detail="DATABASE_URL not configured")
+    dsn = DB_DSN
+    if "sslmode=" not in dsn:
+        dsn = dsn + ("&" if "?" in dsn else "?") + "sslmode=require"
+    try:
+        with psycopg.connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO messages (content, timestamp) VALUES (%s, %s) RETURNING id",
+                    (msg.content, datetime.utcnow()),
+                )
+                new_id = cur.fetchone()[0]
+                conn.commit()
+        return {"ok": True, "id": new_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/messages", response_model=List[Message])
 def get_messages(limit: int = 100) -> List[Message]:
     """
-    Retrieve the latest messages from Supabase.
+    Retrieve the latest messages from Postgres.
     Use the 'limit' query parameter to limit the number of returned messages.
     """
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    response = (
-        supabase.table("messages")
-        .select("content")
-        .order("timestamp", desc=True)
-        .limit(limit)
-        .execute()
-    )
-    rows = response.data or []
-    return [Message(content=row["content"]) for row in rows]
+    if not DB_DSN:
+        raise HTTPException(status_code=500, detail="DATABASE_URL not configured")
+    dsn = DB_DSN
+    if "sslmode=" not in dsn:
+        dsn = dsn + ("&" if "?" in dsn else "?") + "sslmode=require"
+    try:
+        with psycopg.connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT content FROM messages ORDER BY timestamp DESC LIMIT %s",
+                    (limit,),
+                )
+                rows = cur.fetchall()
+        return [Message(content=row[0]) for row in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
