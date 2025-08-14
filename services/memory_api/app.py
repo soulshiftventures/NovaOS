@@ -2,17 +2,19 @@
 """
 NovaOS Memory API
 
-This FastAPI application acts as the interface to the NovaOS memory store.
-It reads configuration values from environment variables and can optionally
-connect to a Supabase backend when SUPABASE_URL and SUPABASE_ANON_KEY
-are present. Additional endpoints can be added later to read and write
-chat history or other memory structures.
+This FastAPI application stores and retrieves chat messages in a Supabase
+table called "messages". It assumes SUPABASE_URL and SUPABASE_ANON_KEY are
+set in the environment. If those variables are missing, the service will
+still run but the /messages endpoints will return errors.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import List
 import os
+from datetime import datetime
 
-# Try to import the Supabase client if available
+# Attempt to import Supabase client
 try:
     from supabase import create_client, Client  # type: ignore
 except ImportError:
@@ -21,41 +23,65 @@ except ImportError:
 
 app = FastAPI(title="NovaOS Memory API")
 
-# Load configuration from environment
+# Load Supabase credentials from environment
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
-supabase_client: "Client | None" = None
+supabase: "Client | None" = None
 if SUPABASE_URL and SUPABASE_ANON_KEY and create_client:
     try:
-        supabase_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+        supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
     except Exception:
-        # If client creation fails, leave supabase_client as None
-        supabase_client = None
+        supabase = None
+
+class Message(BaseModel):
+    content: str
 
 @app.get("/")
 def root() -> dict[str, str]:
-    """
-    Root endpoint to confirm the service is running.
-    """
+    """Health check root endpoint."""
     return {
         "status": "online",
         "service": "novaos-memory",
-        "version": "0.2.0",
+        "version": "0.3.0",
     }
 
 @app.get("/health")
 def health() -> dict[str, bool]:
-    """
-    Simple health endpoint returning {"ok": True}.
-    """
+    """Simple health endpoint."""
     return {"ok": True}
 
-@app.get("/db_health")
-def db_health() -> dict[str, bool]:
+@app.post("/messages")
+def add_message(msg: Message) -> dict[str, str]:
     """
-    Placeholder endpoint for database health checks.
-    It always returns ok=True. You can extend this to
-    check your Supabase or Postgres connection.
+    Store a message in the Supabase 'messages' table.
+    Expects a JSON body like {"content": "your text"}.
     """
-    return {"ok": True}
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    data = {
+        "content": msg.content,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    result = supabase.table("messages").insert(data).execute()
+    if result.data is None:
+        raise HTTPException(status_code=500, detail="Failed to insert")
+    return {"ok": True, "id": result.data[0]["id"]}
+
+@app.get("/messages", response_model=List[Message])
+def get_messages(limit: int = 100) -> List[Message]:
+    """
+    Retrieve the latest messages from Supabase.
+    The limit parameter controls how many messages are returned.
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    response = (
+        supabase.table("messages")
+        .select("content")
+        .order("timestamp", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    rows = response.data or []
+    return [Message(content=row["content"]) for row in rows]
