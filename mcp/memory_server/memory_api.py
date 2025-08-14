@@ -8,7 +8,7 @@ endpoints for backwards compatibility.
 
 Environment variables required:
 - SUPABASE_URL
-- SUPABASE_ANON_KEY
+- SUPABASE_KEY (preferred) or SUPABASE_ANON_KEY
 - DATABASE_URL (optional, used only for /db/ping)
 """
 
@@ -33,14 +33,17 @@ def _git_sha() -> str:
     return os.getenv("RENDER_GIT_COMMIT", os.getenv("GIT_SHA", "dev"))
 
 # Configure Supabase client
+# We support both SUPABASE_KEY and SUPABASE_ANON_KEY for backwards compatibility.
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
 supabase: "Client | None" = None
-if SUPABASE_URL and SUPABASE_ANON_KEY and create_client:
+if SUPABASE_URL and SUPABASE_KEY and create_client:
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception:
+        # If the client fails to initialize (e.g. invalid key), leave supabase
+        # unset so the /messages endpoints will return a helpful error.
         supabase = None
 
 # Pydantic model for incoming messages
