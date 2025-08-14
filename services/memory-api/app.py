@@ -1,11 +1,11 @@
-from fastapi import FastAPI
+# services/memory-api/app.py
+"""
+Compatibility wrapper for NovaOS memory API.
 
-app = FastAPI(title="NovaOS Memory API")
+This file re-exports the FastAPI `app` defined in services/memory_api/app.py.
+It allows legacy deployment configurations that point to the hyphenated
+directory to use the updated Supabase-backed memory API without changing
+Render’s start command.
+"""
 
-@app.get("/")
-def root():
-    return {"status": "online", "service": "novaos-memory", "version": "0.1.0"}
-
-@app.get("/healthz")
-def healthz():
-    return {"ok": True}
+from services.memory_api.app import app
